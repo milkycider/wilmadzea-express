@@ -364,8 +364,26 @@
       overflow: hidden;
       cursor: pointer;
       transition: border-color 0.2s;
+      position: relative;
     }
     .resource-card:hover { border-color: var(--accent2); }
+    .resource-delete-btn {
+      position: absolute;
+      top: 6px; right: 6px;
+      background: rgba(0,0,0,0.7);
+      border: 1px solid var(--red);
+      color: var(--red);
+      border-radius: 50%;
+      width: 24px; height: 24px;
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1;
+    }
+    .resource-card:hover .resource-delete-btn { display: flex; }
     .resource-thumb {
       width: 100%;
       aspect-ratio: 4/3;
@@ -1631,6 +1649,17 @@ function saveResource() {
   closeModal('resource-modal');
 }
 
+function deleteResource(id) {
+  if (!confirm('この資料を削除しますか？')) return;
+  delete resources[id];
+  if (!isOffline && db) {
+    db.ref(`resources/${id}`).remove();
+  } else {
+    saveOffline();
+  }
+  renderResources();
+}
+
 function renderResources() {
   const grid = document.getElementById('resources-grid');
   const empty = document.getElementById('resources-empty');
@@ -1648,13 +1677,17 @@ function renderResources() {
     card.className = 'resource-card';
     card.onclick = () => openImageModal(res);
 
-    const isImage = res.type && res.type.startsWith('image/');
-    let thumbHtml = isImage
-      ? `<img class="resource-thumb" src="${escHtml(res.url)}" alt="${escHtml(res.name)}" loading="lazy">`
+    // typeが 'image' または 'image/...' どちらでも画像として扱う
+    const isImage = res.type && res.type.startsWith('image');
+    const thumbHtml = isImage
+      ? `<img class="resource-thumb" src="${escHtml(res.url)}" alt="${escHtml(res.name)}" loading="lazy"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+        + `<div class="resource-thumb-placeholder" style="display:none">🖼</div>`
       : `<div class="resource-thumb-placeholder">📄</div>`;
 
     const date = new Date(res.uploadedAt).toLocaleDateString('ja-JP');
     card.innerHTML = `${thumbHtml}
+      <button class="resource-delete-btn" title="削除" onclick="event.stopPropagation(); deleteResource('${escHtml(res.id)}')">×</button>
       <div class="resource-info">
         <div class="resource-name">${escHtml(res.name)}</div>
         <div class="resource-date">${date}</div>
