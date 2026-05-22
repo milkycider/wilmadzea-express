@@ -733,6 +733,10 @@
       <label>タイムライン終了時刻</label>
       <input type="text" id="tl-end" placeholder="例: D1 11:00" style="max-width:200px;">
     </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+      <button class="toolbar-btn primary" onclick="applyTimeRange()">反映する</button>
+      <span id="tl-error" style="color:var(--red);font-size:12px;display:none;"></span>
+    </div>
 
     <div style="margin-top:20px;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;">
       <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">データ操作</div>
@@ -964,18 +968,59 @@
 // CONSTANTS & DEFAULT DATA
 // ═══════════════════════════════════════════════════
 
-const TIME_SLOTS = (() => {
+let TIME_SLOTS = buildTimeSlots(0, 15, 1, 11); // デフォルト: D0 15:00 〜 D1 11:00
+
+function buildTimeSlots(startDay, startHour, endDay, endHour) {
   const slots = [];
-  // Day 0: 15:00 - 23:00
-  for (let h = 15; h <= 23; h++) {
-    slots.push({ key: `d0h${h}`, label: `${String(h).padStart(2,'0')}:00`, day: 0, hour: h });
-  }
-  // Day 1: 00:00 - 11:00
-  for (let h = 0; h <= 11; h++) {
-    slots.push({ key: `d1h${h}`, label: `${String(h).padStart(2,'0')}:00`, day: 1, hour: h });
+  for (let day = startDay; day <= endDay; day++) {
+    const from = (day === startDay) ? startHour : 0;
+    const to   = (day === endDay)   ? endHour  : 23;
+    for (let h = from; h <= to; h++) {
+      slots.push({ key: `d${day}h${h}`, label: `${String(h).padStart(2,'0')}:00`, day, hour: h });
+    }
   }
   return slots;
-})();
+}
+
+function parseTimeInput(str) {
+  // "D0 15:00" or "d1 03:00"
+  const m = str.trim().match(/^[Dd](\d)\s+(\d{1,2}):\d{2}$/);
+  if (!m) return null;
+  return { day: parseInt(m[1]), hour: parseInt(m[2]) };
+}
+
+function applyTimeRange() {
+  const startStr = document.getElementById('tl-start').value;
+  const endStr   = document.getElementById('tl-end').value;
+  const errEl    = document.getElementById('tl-error');
+
+  const start = parseTimeInput(startStr);
+  const end   = parseTimeInput(endStr);
+
+  if (!start || !end) {
+    errEl.style.display = 'inline';
+    errEl.textContent = '形式が正しくありません。例: D0 15:00';
+    return;
+  }
+  if (start.day > end.day || (start.day === end.day && start.hour >= end.hour)) {
+    errEl.style.display = 'inline';
+    errEl.textContent = '終了時刻は開始時刻より後にしてください。';
+    return;
+  }
+
+  errEl.style.display = 'none';
+  TIME_SLOTS = buildTimeSlots(start.day, start.hour, end.day, end.hour);
+
+  // Firebaseに保存（任意）
+  if (!isOffline && db) {
+    db.ref('config/timeRange').set({ startStr, endStr });
+  } else {
+    sessionStorage.setItem('wex_timerange', JSON.stringify({ startStr, endStr }));
+  }
+
+  renderTimeline();
+  switchTab('timeline');
+}
 
 const AVAILABLE_TAGS = [
   { id: 'key', label: '重要', color: '#e74c3c' },
@@ -1103,6 +1148,18 @@ function initFirebase(cfg) {
     db = firebase.database();
 
     setSyncStatus('syncing', '同期中…');
+
+    // Load time range config
+    db.ref('config/timeRange').once('value').then(snap => {
+      const val = snap.val();
+      if (val) {
+        document.getElementById('tl-start').value = val.startStr || '';
+        document.getElementById('tl-end').value   = val.endStr   || '';
+        const s = parseTimeInput(val.startStr);
+        const e = parseTimeInput(val.endStr);
+        if (s && e) TIME_SLOTS = buildTimeSlots(s.day, s.hour, e.day, e.hour);
+      }
+    });
 
     // Listen for rooms config
     db.ref('rooms').on('value', snap => {
