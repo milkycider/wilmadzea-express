@@ -1701,7 +1701,7 @@ function openImageModal(res) {
   const nameEl = document.getElementById('image-modal-name');
   const dlLink = document.getElementById('image-modal-dl');
 
-  if (res.type && res.type.startsWith('image/')) {
+  if (res.type && res.type.startsWith('image')) {
     img.src = res.url;
     img.style.display = 'block';
   } else {
