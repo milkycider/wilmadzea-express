@@ -1235,7 +1235,7 @@ function setSyncStatus(state, label) {
 // ═══════════════════════════════════════════════════
 
 function loadSavedConfig() {
-  const raw = sessionStorage.getItem('wex_firebase_cfg');
+  const raw = localStorage.getItem('wex_firebase_cfg');
   if (!raw) return null;
   try { return JSON.parse(raw); } catch(e) { return null; }
 }
@@ -1259,7 +1259,7 @@ function saveFirebaseConfig() {
 
   const ok = initFirebase(cfg);
   if (ok) {
-    sessionStorage.setItem('wex_firebase_cfg', JSON.stringify(cfg));
+    localStorage.setItem('wex_firebase_cfg', JSON.stringify(cfg));
     document.getElementById('setup-modal').classList.remove('open');
     // Push default rooms if none exist yet
     db.ref('rooms').once('value').then(snap => {
