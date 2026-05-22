@@ -541,25 +541,61 @@
     }
 
     /* Image viewer modal */
-    #image-modal .modal-box {
-      max-width: 90vw;
-      max-height: 90vh;
-      background: transparent;
-      border: none;
-      box-shadow: none;
+    #image-modal {
+      flex-direction: column;
+      gap: 0;
     }
-    #image-modal img {
-      max-width: 100%;
-      max-height: 80vh;
-      border-radius: 4px;
+    #image-viewer-wrap {
+      position: relative;
+      width: 90vw;
+      height: 80vh;
+      overflow: hidden;
+      border-radius: 6px;
+      background: rgba(0,0,0,0.5);
+      cursor: grab;
+      user-select: none;
+    }
+    #image-viewer-wrap.dragging { cursor: grabbing; }
+    #image-modal-img {
+      position: absolute;
+      transform-origin: 0 0;
       display: block;
-      margin: 0 auto;
+      /* size/position set by JS */
+    }
+    #image-viewer-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
     }
     #image-modal-name {
-      text-align: center;
       color: var(--text2);
-      margin-top: 10px;
       font-size: 12px;
+      flex: 1;
+      text-align: center;
+      min-width: 100%;
+      order: -1;
+      margin-bottom: 6px;
+    }
+    .zoom-btn {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 4px;
+      padding: 4px 12px;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      transition: background 0.15s;
+    }
+    .zoom-btn:hover { background: var(--bg4); }
+    #zoom-level-label {
+      font-size: 12px;
+      color: var(--text2);
+      min-width: 44px;
+      text-align: center;
     }
 
     /* Empty state */
@@ -903,14 +939,21 @@
 </div>
 
 <!-- Image viewer modal -->
-<div class="modal-overlay" id="image-modal" onclick="closeModal('image-modal')">
-  <div class="modal-box" style="max-width:90vw;background:transparent;border:none;box-shadow:none;">
-    <img id="image-modal-img" src="" alt="">
-    <div id="image-modal-name" style="text-align:center;color:var(--text2);margin-top:10px;font-size:12px;"></div>
-    <div style="text-align:center;margin-top:10px;">
-      <button class="toolbar-btn" onclick="closeModal('image-modal')" style="display:inline-block;">閉じる</button>
-      <a id="image-modal-dl" href="" target="_blank" class="toolbar-btn" style="display:inline-block;text-decoration:none;margin-left:8px;">別タブで開く</a>
-    </div>
+<div class="modal-overlay" id="image-modal">
+  <div id="image-viewer-bar">
+    <div id="image-modal-name"></div>
+    <button class="zoom-btn" onclick="zoomBy(0.25)" title="拡大">＋</button>
+    <span id="zoom-level-label">100%</span>
+    <button class="zoom-btn" onclick="zoomBy(-0.25)" title="縮小">－</button>
+    <button class="zoom-btn" onclick="zoomReset()" title="リセット（ダブルクリックでも可）">⤢</button>
+    <a id="image-modal-dl" href="" target="_blank" class="toolbar-btn" style="text-decoration:none;">別タブで開く</a>
+    <button class="toolbar-btn" onclick="closeModal('image-modal')">閉じる</button>
+  </div>
+  <div id="image-viewer-wrap">
+    <img id="image-modal-img" src="" alt="" draggable="false">
+  </div>
+  <div style="font-size:11px;color:var(--text3);margin-top:6px;text-align:center;">
+    スクロール：ズーム　ドラッグ：移動　ダブルクリック：リセット
   </div>
 </div>
 
@@ -1696,22 +1739,134 @@ function renderResources() {
   });
 }
 
+// ── Image viewer with zoom/pan ──
+let imgScale = 1;
+let imgX = 0;
+let imgY = 0;
+let imgNaturalW = 0;
+let imgNaturalH = 0;
+let isDragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let dragOriginX = 0;
+let dragOriginY = 0;
+
 function openImageModal(res) {
   const img = document.getElementById('image-modal-img');
   const nameEl = document.getElementById('image-modal-name');
   const dlLink = document.getElementById('image-modal-dl');
 
-  if (res.type && res.type.startsWith('image')) {
-    img.src = res.url;
-    img.style.display = 'block';
-  } else {
-    img.style.display = 'none';
-  }
   nameEl.textContent = res.name;
   dlLink.href = res.url;
 
+  if (res.type && res.type.startsWith('image')) {
+    img.style.display = 'block';
+    img.onload = () => {
+      imgNaturalW = img.naturalWidth;
+      imgNaturalH = img.naturalHeight;
+      zoomReset();
+    };
+    img.src = res.url;
+  } else {
+    img.style.display = 'none';
+  }
+
   document.getElementById('image-modal').classList.add('open');
 }
+
+function getWrap() { return document.getElementById('image-viewer-wrap'); }
+function getImg()  { return document.getElementById('image-modal-img'); }
+
+function applyTransform() {
+  getImg().style.transform = `translate(${imgX}px, ${imgY}px) scale(${imgScale})`;
+  document.getElementById('zoom-level-label').textContent = Math.round(imgScale * 100) + '%';
+}
+
+function zoomReset() {
+  const wrap = getWrap();
+  const ww = wrap.clientWidth;
+  const wh = wrap.clientHeight;
+  if (!imgNaturalW || !imgNaturalH) { imgScale = 1; imgX = 0; imgY = 0; applyTransform(); return; }
+
+  // fit to wrap
+  const scaleW = ww / imgNaturalW;
+  const scaleH = wh / imgNaturalH;
+  imgScale = Math.min(scaleW, scaleH, 1); // never upscale beyond 100%
+  imgX = (ww - imgNaturalW * imgScale) / 2;
+  imgY = (wh - imgNaturalH * imgScale) / 2;
+  applyTransform();
+}
+
+function zoomBy(delta) {
+  const wrap = getWrap();
+  const cx = wrap.clientWidth / 2;
+  const cy = wrap.clientHeight / 2;
+  zoomAt(cx, cy, delta);
+}
+
+function zoomAt(cx, cy, delta) {
+  const minScale = 0.1;
+  const maxScale = 8;
+  const newScale = Math.min(maxScale, Math.max(minScale, imgScale + delta));
+  const ratio = newScale / imgScale;
+  // zoom towards cursor point
+  imgX = cx - (cx - imgX) * ratio;
+  imgY = cy - (cy - imgY) * ratio;
+  imgScale = newScale;
+  applyTransform();
+}
+
+// Scroll to zoom
+(function setupImageViewer() {
+  document.addEventListener('DOMContentLoaded', () => {});
+  // Run after DOM is ready - attach at startup
+  function attach() {
+    const wrap = document.getElementById('image-viewer-wrap');
+    if (!wrap) { setTimeout(attach, 100); return; }
+
+    // Wheel zoom
+    wrap.addEventListener('wheel', e => {
+      e.preventDefault();
+      const rect = wrap.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const delta = e.deltaY < 0 ? 0.15 : -0.15;
+      zoomAt(cx, cy, delta);
+    }, { passive: false });
+
+    // Drag to pan
+    wrap.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      dragOriginX = imgX;
+      dragOriginY = imgY;
+      wrap.classList.add('dragging');
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!isDragging) return;
+      imgX = dragOriginX + (e.clientX - dragStartX);
+      imgY = dragOriginY + (e.clientY - dragStartY);
+      applyTransform();
+    });
+    document.addEventListener('mouseup', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      getWrap().classList.remove('dragging');
+    });
+
+    // Double-click to reset
+    wrap.addEventListener('dblclick', () => zoomReset());
+
+    // Click outside wrap to close
+    document.getElementById('image-modal').addEventListener('click', e => {
+      if (e.target === document.getElementById('image-modal')) closeModal('image-modal');
+    });
+  }
+  attach();
+})();
 
 // ═══════════════════════════════════════════════════
 // TAB SWITCHING
