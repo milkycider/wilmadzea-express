@@ -744,6 +744,185 @@
       font-family: inherit;
     }
     .add-location-row input:focus { outline: none; border-color: var(--accent2); }
+
+    /* ── Location Timeline Tab ── */
+    #loctimeline-toolbar {
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    #loctimeline-wrap {
+      flex: 1;
+      overflow: auto;
+      position: relative;
+    }
+    #loctimeline-table {
+      border-collapse: collapse;
+      min-width: max-content;
+    }
+    #loctimeline-table thead th {
+      background: var(--bg2);
+      position: sticky;
+      top: 0;
+      z-index: 3;
+    }
+    #loctimeline-table thead .col-name {
+      z-index: 4;
+    }
+    .loc-row td {
+      border: 1px solid var(--border);
+      vertical-align: top;
+      padding: 0;
+      height: var(--row-h);
+    }
+    .loc-name-cell {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: var(--bg2);
+      min-width: var(--name-w);
+      max-width: var(--name-w);
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      border-right: 2px solid var(--border);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .loc-cell {
+      width: var(--cell-w);
+      min-width: var(--cell-w);
+      max-width: var(--cell-w);
+      padding: 3px;
+      vertical-align: top;
+    }
+    .loc-char-chip {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 10px;
+      margin-bottom: 2px;
+      background: var(--bg3);
+      cursor: pointer;
+      overflow: hidden;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .loc-char-chip:hover { background: var(--bg4); }
+    .loc-char-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .loc-row-unassigned .loc-name-cell { color: var(--text3); font-style: italic; font-weight: normal; }
+
+    /* ── Notes Tab ── */
+    #notes-panel {
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    #notes-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    #notes-toolbar h2 { font-size: 14px; color: var(--accent); letter-spacing: .1em; }
+    #note-search {
+      flex: 1;
+      min-width: 160px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-family: inherit;
+    }
+    #note-search:focus { outline: none; border-color: var(--accent2); }
+    .notes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+    .note-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      position: relative;
+    }
+    .note-card:hover { border-color: var(--accent2); }
+    .note-card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding-right: 60px;
+    }
+    .note-card-body {
+      font-size: 11px;
+      color: var(--text2);
+      line-height: 1.6;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-bottom: 8px;
+      white-space: pre-wrap;
+    }
+    .note-card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+    }
+    .note-tag {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1px 7px;
+      font-size: 10px;
+      color: var(--text2);
+    }
+    .note-time-ref { font-size: 10px; color: var(--accent); }
+    .note-char-ref { font-size: 10px; color: var(--teal); }
+    .note-card-actions {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      display: none;
+      gap: 4px;
+    }
+    .note-card:hover .note-card-actions { display: flex; }
+    .note-action-btn {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      border-radius: 3px;
+      padding: 2px 7px;
+      font-size: 10px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .note-action-btn:hover { color: var(--text); border-color: var(--text3); }
+    .note-updated {
+      font-size: 10px;
+      color: var(--text3);
+      margin-top: 6px;
+    }
   </style>
 </head>
 <body>
@@ -760,9 +939,11 @@
 
 <!-- ═══ TAB BAR ═══ -->
 <div id="tab-bar">
-  <button class="tab-btn active" onclick="switchTab('timeline')">📋 タイムライン</button>
-  <button class="tab-btn" onclick="switchTab('resources')">🗂 資料一覧</button>
-  <button class="tab-btn" onclick="switchTab('settings')">⚙ 設定</button>
+  <button class="tab-btn active" data-tab="timeline"    onclick="switchTab('timeline')">📋 キャラクタータイムライン</button>
+  <button class="tab-btn"        data-tab="loctimeline" onclick="switchTab('loctimeline')">📍 場所タイムライン</button>
+  <button class="tab-btn"        data-tab="notes"       onclick="switchTab('notes')">📝 調査メモ</button>
+  <button class="tab-btn"        data-tab="resources"   onclick="switchTab('resources')">🗂 資料一覧</button>
+  <button class="tab-btn"        data-tab="settings"    onclick="switchTab('settings')">⚙ 設定</button>
 </div>
 
 <!-- ═══ TAB: TIMELINE ═══ -->
@@ -787,6 +968,38 @@
       </thead>
       <tbody id="timeline-body"></tbody>
     </table>
+  </div>
+</div>
+
+<!-- ═══ TAB: LOCATION TIMELINE ═══ -->
+<div id="tab-loctimeline" class="tab-panel">
+  <div id="loctimeline-toolbar">
+    <span style="font-size:11px;color:var(--text2);">キャラクタータイムラインの「場所」欄を場所ごとに集計した逆引きビューです。チップをクリックすると元のセルにジャンプします。</span>
+    <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);cursor:pointer;margin-left:auto;">
+      <input type="checkbox" id="loctimeline-hide-empty" onchange="renderLocTimeline()"> 空行を非表示
+    </label>
+    <button class="toolbar-btn" onclick="renderLocTimeline()">🔄 更新</button>
+  </div>
+  <div id="loctimeline-wrap">
+    <div class="empty-state" style="margin:40px auto;text-align:center;color:var(--text3);">
+      設定タブで場所リストを登録し、キャラクタータイムラインのセルに場所を入力すると表示されます。
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB: NOTES ═══ -->
+<div id="tab-notes" class="tab-panel">
+  <div id="notes-panel">
+    <div id="notes-toolbar">
+      <h2>📝 調査メモ</h2>
+      <input type="text" id="note-search" placeholder="タイトル・内容・タグで検索…" oninput="renderNotes()">
+      <button class="toolbar-btn primary" onclick="openAddNoteModal()">＋ メモを追加</button>
+    </div>
+    <div class="notes-grid" id="notes-grid">
+      <div class="empty-state" id="notes-empty" style="grid-column:1/-1;">
+        まだ調査メモがありません。<br>「＋ メモを追加」から記録を始めてください。
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1100,6 +1313,45 @@
   </div>
 </div>
 
+<!-- ═══ Note Edit Modal ═══ -->
+<div class="modal-overlay" id="note-modal">
+  <div class="modal-box" style="max-width:580px;">
+    <div class="modal-header">
+      <h2 id="note-modal-title">＋ 調査メモを追加</h2>
+      <button class="modal-close" onclick="closeModal('note-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>タイトル</label>
+        <input type="text" id="note-title-input" placeholder="例：食堂車での目撃情報、アリバイ確認">
+      </div>
+      <div class="form-group">
+        <label>内容</label>
+        <textarea id="note-body-input" style="min-height:130px;" placeholder="調査内容、証言、推理など…"></textarea>
+      </div>
+      <div class="form-group">
+        <label>タグ <span style="color:var(--text3);font-size:10px;">カンマ区切りで複数入力可</span></label>
+        <input type="text" id="note-tags-input" placeholder="例：目撃情報、アリバイ、証拠品">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>時刻参照 <span style="color:var(--text3);font-size:10px;">自由記述</span></label>
+          <input type="text" id="note-time-ref-input" placeholder="例：出発日 15:00頃">
+        </div>
+        <div class="form-group">
+          <label>関連キャラクター</label>
+          <select id="note-char-select"><option value="">（なし）</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="toolbar-btn" id="note-delete-btn" style="color:var(--red);border-color:var(--red);display:none;" onclick="deleteNoteConfirm()">削除</button>
+      <button class="toolbar-btn" onclick="closeModal('note-modal')">キャンセル</button>
+      <button class="toolbar-btn primary" onclick="saveNote()">保存</button>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 
@@ -1265,6 +1517,7 @@ let timelineData = {};
 
 let resources = {};
 let locationList = [];
+let notes = {}; // { noteId: { id, title, body, tags, timeRef, charId, createdAt, updatedAt } }
 let editingCell = null;
 let isOffline = false;
 let activeTags = new Set();
@@ -1393,6 +1646,14 @@ function initFirebase(cfg) {
       renderResources();
     });
 
+    // Listen for notes
+    db.ref('notes').on('value', snap => {
+      const val = snap.val();
+      notes = val && typeof val === 'object' ? val : {};
+      // Re-render if notes tab is active
+      if (document.getElementById('tab-notes').classList.contains('active')) renderNotes();
+    });
+
     isOffline = false;
     return true;
   } catch (e) {
@@ -1415,6 +1676,7 @@ function initOffline() {
       timelineData = normalizeTimeline(parsed.timeline || {});
       resources = parsed.resources || {};
       locationList = parsed.locationList || [];
+      notes = parsed.notes || {};
       if (parsed.rooms) rooms = normalizeRooms(parsed.rooms);
     } catch(e) {}
   }
@@ -1433,6 +1695,7 @@ function saveOffline() {
     resources,
     rooms,
     locationList,
+    notes,
   }));
 }
 
@@ -2358,12 +2621,12 @@ function zoomAt(cx, cy, delta) {
 function switchTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
-  document.querySelectorAll('.tab-btn').forEach(b => {
-    if (b.textContent.includes(name === 'timeline' ? 'タイムライン' : name === 'resources' ? '資料' : '設定')) {
-      b.classList.add('active');
-    }
-  });
+  const panel = document.getElementById('tab-' + name);
+  if (panel) panel.classList.add('active');
+  document.querySelectorAll(`.tab-btn[data-tab="${name}"]`).forEach(b => b.classList.add('active'));
+  // 場所タイムライン・調査メモは切り替え時にレンダリング
+  if (name === 'loctimeline') renderLocTimeline();
+  if (name === 'notes') renderNotes();
 }
 
 // ═══════════════════════════════════════════════════
@@ -2394,11 +2657,281 @@ document.addEventListener('keydown', e => {
 });
 
 // ═══════════════════════════════════════════════════
+// LOCATION TIMELINE
+// ═══════════════════════════════════════════════════
+
+function renderLocTimeline() {
+  const wrap = document.getElementById('loctimeline-wrap');
+  if (!wrap) return;
+
+  const hideEmpty = document.getElementById('loctimeline-hide-empty').checked;
+
+  // キャラID→{name,color} マップを構築
+  const allChars = {};
+  rooms.forEach(room => room.chars.forEach(ch => {
+    allChars[ch.id] = { name: ch.name, color: ch.color || '#888' };
+  }));
+
+  // locIndex: { locName: { slotKey: [{charId, name, color},...] } }
+  const locIndex = {};
+
+  // locationListの場所をあらかじめ登録（データがなくても行を出す）
+  locationList.forEach(loc => { if (loc) locIndex[loc] = {}; });
+
+  // timelineDataから逆引き構築
+  Object.entries(timelineData).forEach(([charId, slots]) => {
+    if (!slots || typeof slots !== 'object') return;
+    const chInfo = allChars[charId];
+    if (!chInfo) return;
+    Object.entries(slots).forEach(([slotKey, data]) => {
+      if (!data) return;
+      const loc = (data.location || '').trim();
+      if (loc) {
+        if (!locIndex[loc]) locIndex[loc] = {};
+        if (!locIndex[loc][slotKey]) locIndex[loc][slotKey] = [];
+        locIndex[loc][slotKey].push({ charId, ...chInfo });
+      } else {
+        // 場所未記入はまとめる
+        const key = '（場所なし）';
+        if (!locIndex[key]) locIndex[key] = {};
+        if (!locIndex[key][slotKey]) locIndex[key][slotKey] = [];
+        locIndex[key][slotKey].push({ charId, ...chInfo });
+      }
+    });
+  });
+
+  // 全スロットが空の場所を hideEmpty 時に除外
+  const locEntries = Object.entries(locIndex).filter(([loc, slotMap]) => {
+    if (!hideEmpty) return true;
+    return Object.values(slotMap).some(arr => arr.length > 0);
+  });
+
+  if (locEntries.length === 0) {
+    wrap.innerHTML = '<div class="empty-state" style="margin:40px auto;text-align:center;color:var(--text3);">場所データがありません。<br>キャラクタータイムラインのセルに場所を入力してください。</div>';
+    return;
+  }
+
+  // テーブル構築
+  const table = document.createElement('table');
+  table.id = 'loctimeline-table';
+
+  // ─ ヘッダー行 ─
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  headerRow.className = 'row-header';
+  const cornerTh = document.createElement('th');
+  cornerTh.className = 'col-name';
+  cornerTh.textContent = '場所';
+  headerRow.appendChild(cornerTh);
+  TIME_SLOTS.forEach(slot => {
+    const th = document.createElement('th');
+    th.className = 'time-header' + (slot.hour === 0 && slot.day > 0 ? ' day-change' : '');
+    th.innerHTML = `<span class="day-label">${slot.day === 0 ? '出発日' : '翌日'}</span><span class="hour-label">${slot.label}</span>`;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  // ─ 本体 ─
+  const tbody = document.createElement('tbody');
+  locEntries.forEach(([locName, slotMap]) => {
+    const isUnassigned = locName === '（場所なし）';
+    const tr = document.createElement('tr');
+    tr.className = 'loc-row' + (isUnassigned ? ' loc-row-unassigned' : '');
+
+    const nameTd = document.createElement('td');
+    nameTd.className = 'col-name loc-name-cell';
+    nameTd.textContent = locName;
+    nameTd.title = locName;
+    tr.appendChild(nameTd);
+
+    TIME_SLOTS.forEach(slot => {
+      const td = document.createElement('td');
+      td.className = 'loc-cell' + (slot.hour === 0 && slot.day > 0 ? ' day-change' : '');
+      const chars = slotMap[slot.key] || [];
+      chars.forEach(ch => {
+        const chip = document.createElement('div');
+        chip.className = 'loc-char-chip';
+        chip.title = ch.name;
+        const shortName = ch.name.length > 9 ? ch.name.slice(0, 8) + '…' : ch.name;
+        chip.innerHTML = `<span class="loc-char-dot" style="background:${escHtml(ch.color)}"></span>${escHtml(shortName)}`;
+        // クリックでキャラクタータイムラインの該当セルへジャンプ
+        chip.addEventListener('click', () => {
+          switchTab('timeline');
+          const el = document.getElementById(`cell-${ch.charId}-${slot.key}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+            el.style.outline = '2px solid var(--accent)';
+            el.style.outlineOffset = '-2px';
+            setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 1800);
+          }
+        });
+        td.appendChild(chip);
+      });
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+
+  wrap.innerHTML = '';
+  wrap.appendChild(table);
+}
+
+// ═══════════════════════════════════════════════════
+// NOTES (調査メモ)
+// ═══════════════════════════════════════════════════
+
+let editingNoteId = null;
+
+function renderNotes() {
+  const grid   = document.getElementById('notes-grid');
+  const empty  = document.getElementById('notes-empty');
+  const search = (document.getElementById('note-search').value || '').toLowerCase();
+
+  let list = Object.values(notes);
+  if (search) {
+    list = list.filter(n =>
+      (n.title  || '').toLowerCase().includes(search) ||
+      (n.body   || '').toLowerCase().includes(search) ||
+      (n.tags   || []).some(t => t.toLowerCase().includes(search)) ||
+      (n.timeRef|| '').toLowerCase().includes(search)
+    );
+  }
+  list.sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+
+  // カード以外（empty stateのみ残す）を削除してから追記
+  Array.from(grid.children).forEach(el => { if (el.id !== 'notes-empty') el.remove(); });
+
+  if (list.length === 0) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  list.forEach(note => {
+    // キャラ名を解決
+    let charName = '';
+    if (note.charId) {
+      for (const room of rooms) {
+        const ch = room.chars.find(c => c.id === note.charId);
+        if (ch) { charName = ch.name; break; }
+      }
+    }
+    const tagsHtml   = (note.tags || []).map(t => `<span class="note-tag">${escHtml(t)}</span>`).join('');
+    const timeHtml   = note.timeRef  ? `<span class="note-time-ref">🕐 ${escHtml(note.timeRef)}</span>` : '';
+    const charHtml   = charName      ? `<span class="note-char-ref">👤 ${escHtml(charName)}</span>`     : '';
+    const updatedStr = note.updatedAt ? new Date(note.updatedAt).toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+
+    const card = document.createElement('div');
+    card.className = 'note-card';
+    card.dataset.noteId = note.id;
+    card.innerHTML = `
+      <div class="note-card-actions">
+        <button class="note-action-btn" onclick="openEditNoteModal('${escHtml(note.id)}');event.stopPropagation()">編集</button>
+        <button class="note-action-btn" style="color:var(--red)" onclick="deleteNoteById('${escHtml(note.id)}');event.stopPropagation()">削除</button>
+      </div>
+      <div class="note-card-title">${escHtml(note.title || '（無題）')}</div>
+      <div class="note-card-body">${escHtml(note.body || '')}</div>
+      <div class="note-card-meta">${tagsHtml}${timeHtml}${charHtml}</div>
+      ${updatedStr ? `<div class="note-updated">更新: ${updatedStr}</div>` : ''}
+    `;
+    card.addEventListener('click', () => openEditNoteModal(note.id));
+    grid.appendChild(card);
+  });
+}
+
+function openAddNoteModal() {
+  editingNoteId = null;
+  document.getElementById('note-modal-title').textContent = '＋ 調査メモを追加';
+  document.getElementById('note-title-input').value = '';
+  document.getElementById('note-body-input').value  = '';
+  document.getElementById('note-tags-input').value  = '';
+  document.getElementById('note-time-ref-input').value = '';
+  populateNoteCharSelect('');
+  document.getElementById('note-delete-btn').style.display = 'none';
+  document.getElementById('note-modal').classList.add('open');
+  document.getElementById('note-title-input').focus();
+}
+
+function openEditNoteModal(noteId) {
+  const note = notes[noteId];
+  if (!note) return;
+  editingNoteId = noteId;
+  document.getElementById('note-modal-title').textContent = '調査メモを編集';
+  document.getElementById('note-title-input').value = note.title    || '';
+  document.getElementById('note-body-input').value  = note.body     || '';
+  document.getElementById('note-tags-input').value  = (note.tags || []).join(', ');
+  document.getElementById('note-time-ref-input').value = note.timeRef || '';
+  populateNoteCharSelect(note.charId || '');
+  document.getElementById('note-delete-btn').style.display = 'inline-block';
+  document.getElementById('note-modal').classList.add('open');
+  document.getElementById('note-title-input').focus();
+}
+
+function populateNoteCharSelect(selectedId) {
+  const sel = document.getElementById('note-char-select');
+  sel.innerHTML = '<option value="">（なし）</option>';
+  rooms.forEach(room => {
+    room.chars.forEach(ch => {
+      const opt = document.createElement('option');
+      opt.value = ch.id;
+      opt.textContent = `${ch.name}${room.name ? '（' + room.name + '）' : ''}`;
+      if (ch.id === selectedId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  });
+}
+
+function saveNote() {
+  const title   = document.getElementById('note-title-input').value.trim();
+  const body    = document.getElementById('note-body-input').value.trim();
+  const tagsRaw = document.getElementById('note-tags-input').value.trim();
+  const tags    = tagsRaw ? tagsRaw.split(/[,、]/).map(t => t.trim()).filter(Boolean) : [];
+  const timeRef = document.getElementById('note-time-ref-input').value.trim();
+  const charId  = document.getElementById('note-char-select').value;
+
+  if (!title && !body) { document.getElementById('note-title-input').focus(); return; }
+
+  const noteId    = editingNoteId || ('n' + Date.now());
+  const existing  = notes[noteId] || {};
+  const noteData  = {
+    id: noteId, title, body, tags, timeRef, charId,
+    createdAt: existing.createdAt || Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  notes[noteId] = noteData;
+
+  if (!isOffline && db) {
+    db.ref(`notes/${noteId}`).set(noteData);
+  } else {
+    saveOffline();
+    renderNotes();
+  }
+  closeModal('note-modal');
+}
+
+function deleteNoteConfirm() {
+  if (!editingNoteId) return;
+  deleteNoteById(editingNoteId);
+  closeModal('note-modal');
+}
+
+function deleteNoteById(noteId) {
+  if (!confirm('このメモを削除しますか？')) return;
+  delete notes[noteId];
+  if (!isOffline && db) {
+    db.ref(`notes/${noteId}`).remove();
+  } else {
+    saveOffline();
+    renderNotes();
+  }
+}
+
+// ═══════════════════════════════════════════════════
 // EXPORT / IMPORT
 // ═══════════════════════════════════════════════════
 
 function exportData() {
-  const data = { rooms, timeline: timelineData, resources, locationList, exportedAt: Date.now() };
+  const data = { rooms, timeline: timelineData, resources, locationList, notes, exportedAt: Date.now() };
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
@@ -2429,6 +2962,10 @@ function importData(event) {
         saveLocationList();
         renderLocationList();
         updateLocationDatalist();
+      }
+      if (data.notes) {
+        notes = data.notes;
+        if (!isOffline && db) db.ref('notes').set(notes);
       }
       renderTimeline();
       alert('インポート完了！');
