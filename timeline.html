@@ -1243,6 +1243,16 @@ const DEFAULT_ROOMS = [
   },
 ];
 
+// デフォルト部屋IDセット（空になっても削除しない）
+const DEFAULT_ROOM_IDS = new Set(DEFAULT_ROOMS.map(r => r.id));
+
+// 空になった動的部屋（デフォルト以外）を rooms から除去して persist
+function cleanEmptyDynamicRooms() {
+  const before = rooms.length;
+  rooms = rooms.filter(r => DEFAULT_ROOM_IDS.has(r.id) || r.chars.length > 0);
+  if (rooms.length !== before) persistRooms();
+}
+
 // ═══════════════════════════════════════════════════
 // APP STATE
 // ═══════════════════════════════════════════════════
@@ -1518,6 +1528,9 @@ function renderTimelineBody() {
   tbody.innerHTML = '';
 
   rooms.forEach((room, ri) => {
+    // デフォルト部屋以外でキャラが0人なら描画しない（Firebase残骸の保険）
+    if (!DEFAULT_ROOM_IDS.has(room.id) && room.chars.length === 0) return;
+
     const isEvent = !!room.isEventRoom;
 
     // ── Room header row: 2-cell structure for sticky name ──
@@ -2075,6 +2088,8 @@ function saveEditChar() {
     oldRoom.chars.splice(charIdx, 1);
     const newRoom = rooms.find(r => r.id === newRoomId);
     if (newRoom) newRoom.chars.push(updatedChar);
+    // 移動元が空になった動的部屋は除去
+    cleanEmptyDynamicRooms();
   } else {
     oldRoom.chars[charIdx] = updatedChar;
   }
@@ -2094,6 +2109,8 @@ function deleteChar() {
   if (!room) return;
   room.chars = room.chars.filter(c => c.id !== charId);
 
+  // キャラ削除後、空になった動的部屋は除去
+  cleanEmptyDynamicRooms();
   persistRooms();
   renderTimelineBody();
   renderCells();
