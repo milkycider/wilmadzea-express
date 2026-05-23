@@ -12,15 +12,11 @@
    セットアップ手順:
    1. https://console.firebase.google.com/ でプロジェクトを作成
    2. 「Realtime Database」を有効化 → ルールを開発用に設定
-      (本番前にセキュリティルールを適切に設定してください)
    3. 「プロジェクトの設定」→「マイアプリ」→ Webアプリを追加してconfigを取得
    4. このページを開くと設定画面が表示されるのでconfigを貼り付けてください
 
    GitHub Pages でホストする場合:
    - このHTMLファイルをリポジトリに置いてGitHub Pagesを有効化するだけで動きます
-
-   レンタルサーバーでホストする場合:
-   - HTMLファイルをアップロードして、そのURLにアクセスしてください
   ═══════════════════════════════════════════════════════════════
   -->
 
@@ -44,10 +40,11 @@
       --gold: #ffb009;
       --purple: #9b59b6;
       --green: #27ae60;
+      --orange: #e67e22;
       --modal-bg: rgba(0,0,0,0.85);
       --cell-w: 130px;
-      --name-w: 170px;
-      --row-h: 58px;
+      --name-w: 180px;
+      --row-h: 60px;
       --header-h: 52px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -134,7 +131,7 @@
     #timeline-toolbar {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       padding: 8px 12px;
       background: var(--bg2);
       border-bottom: 1px solid var(--border);
@@ -150,6 +147,7 @@
       cursor: pointer;
       font-size: 12px;
       transition: all 0.15s;
+      white-space: nowrap;
     }
     .toolbar-btn:hover { background: var(--bg4); border-color: var(--accent2); }
     .toolbar-btn.primary {
@@ -158,6 +156,12 @@
       color: #fff;
     }
     .toolbar-btn.primary:hover { background: var(--accent); }
+    .toolbar-btn.event-btn {
+      background: var(--bg3);
+      border-color: var(--accent2);
+      color: var(--accent);
+    }
+    .toolbar-btn.event-btn:hover { background: var(--bg4); }
     .toolbar-label {
       font-size: 11px;
       color: var(--text2);
@@ -221,22 +225,30 @@
     }
     .time-header.day-change { border-left: 2px solid var(--accent2); }
 
-    /* Room header rows */
-    .room-header-row td {
+    /* Room header rows — 2-cell structure for sticky name */
+    .room-header-row .room-name-cell {
       background: var(--bg3);
       border-top: 2px solid var(--border);
       border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
       padding: 6px 10px;
       font-size: 11px;
       font-weight: 600;
       letter-spacing: 0.1em;
       cursor: pointer;
       user-select: none;
-      position: sticky;
-      left: 0;
-      width: 100%;
+      /* sticky handled by col-name class */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    .room-header-row td:hover { background: var(--bg4); }
+    .room-header-row .room-spacer-cell {
+      background: var(--bg3);
+      border-top: 2px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .room-header-row:hover .room-name-cell,
+    .room-header-row:hover .room-spacer-cell { background: var(--bg4); }
     .room-toggle { margin-right: 8px; display: inline-block; transition: transform 0.2s; }
     .room-header-row.collapsed .room-toggle { transform: rotate(-90deg); }
 
@@ -250,48 +262,97 @@
     }
     .char-row.collapsed { display: none; }
 
+    /* Status row tinting */
+    .char-row.char-status-alive .col-name { border-left: 3px solid var(--green); }
+    .char-row.char-status-dead .col-name { border-left: 3px solid var(--red); }
+    .char-row.char-status-dead { background: rgba(180,83,75,0.06); }
+    .char-row.char-status-missing .col-name { border-left: 3px solid var(--orange); }
+    .char-row.char-status-missing { background: rgba(230,126,34,0.06); }
+    .char-row.char-status-unconscious .col-name { border-left: 3px solid var(--purple); }
+    .char-row.char-status-suspicious .col-name { border-left: 3px solid var(--gold); }
+
+    /* Event rows */
+    .char-row.event-row td { height: var(--row-h); }
+    .char-row.event-row .col-name { background: rgba(200,146,42,0.07); border-left: 3px solid var(--accent2); }
+
+    /* Drag over indicator */
+    .char-row.drag-over td { border-top: 2px solid var(--accent); }
+    .char-row.dragging { opacity: 0.4; }
+
     /* Name cell */
     .name-cell {
-      padding: 6px 8px;
+      padding: 4px 6px;
       display: flex;
       flex-direction: column;
       justify-content: center;
       height: 100%;
       gap: 2px;
-      border-right: 2px solid var(--border);
     }
-    .name-cell .char-name {
-      font-size: 12px;
-      font-weight: 600;
+    .name-cell-top {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
     }
     .char-dot {
       width: 8px; height: 8px;
       border-radius: 50%;
       flex-shrink: 0;
     }
+    .char-name-text {
+      font-size: 12px;
+      font-weight: 600;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .name-cell .char-role {
       font-size: 10px;
       color: var(--text3);
-      padding-left: 14px;
+      padding-left: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    .name-cell .edit-char-btn {
+    /* Controls shown on hover */
+    .char-controls {
+      display: flex;
+      align-items: center;
+      gap: 1px;
       margin-left: auto;
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .col-name:hover .char-controls { opacity: 1; }
+    .char-ctrl-btn {
       background: none;
       border: none;
       color: var(--text3);
-      font-size: 12px;
+      font-size: 11px;
       cursor: pointer;
-      padding: 2px 4px;
+      padding: 2px 3px;
       border-radius: 3px;
-      opacity: 0;
-      transition: opacity 0.15s, color 0.15s;
+      line-height: 1;
+      transition: color 0.15s, background 0.15s;
+    }
+    .char-ctrl-btn:hover { color: var(--accent); background: var(--bg4); }
+
+    /* Status badge */
+    .status-badge {
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 8px;
+      border: 1px solid;
+      letter-spacing: 0.05em;
       flex-shrink: 0;
     }
-    .col-name:hover .edit-char-btn { opacity: 1; }
-    .edit-char-btn:hover { color: var(--accent) !important; }
+    .status-alive { border-color: var(--green); color: var(--green); }
+    .status-dead { border-color: var(--red); color: var(--red); }
+    .status-missing { border-color: var(--orange); color: var(--orange); }
+    .status-unconscious { border-color: var(--purple); color: var(--purple); }
+    .status-suspicious { border-color: var(--gold); color: var(--gold); }
+    .status-unknown { border-color: var(--text3); color: var(--text3); }
 
     /* Timeline cells */
     .timeline-cell {
@@ -314,6 +375,7 @@
       color: var(--text2);
       overflow: hidden;
       height: 100%;
+      position: relative;
     }
     .cell-location {
       font-size: 10px;
@@ -323,6 +385,16 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    .cell-time-detail {
+      position: absolute;
+      top: 1px;
+      right: 0;
+      font-size: 9px;
+      color: var(--text3);
+      background: var(--bg3);
+      padding: 0 2px;
+      border-radius: 2px;
     }
     .cell-action {
       font-size: 10px;
@@ -401,9 +473,7 @@
       font-size: 28px;
       color: var(--text3);
     }
-    .resource-info {
-      padding: 8px 10px;
-    }
+    .resource-info { padding: 8px 10px; }
     .resource-name {
       font-size: 12px;
       font-weight: 600;
@@ -411,11 +481,41 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .resource-date {
-      font-size: 10px;
-      color: var(--text3);
-      margin-top: 2px;
+    .resource-date { font-size: 10px; color: var(--text3); margin-top: 2px; }
+
+    /* ── Location tags (settings) ── */
+    .location-tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-height: 28px;
+      padding: 6px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
     }
+    .location-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg4);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2px 8px 2px 10px;
+      font-size: 11px;
+      color: var(--text);
+    }
+    .location-tag-remove {
+      background: none;
+      border: none;
+      color: var(--text3);
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+      padding: 0;
+      transition: color 0.15s;
+    }
+    .location-tag-remove:hover { color: var(--red); }
 
     /* ── Modals ── */
     .modal-overlay {
@@ -541,10 +641,7 @@
     }
 
     /* Image viewer modal */
-    #image-modal {
-      flex-direction: column;
-      gap: 0;
-    }
+    #image-modal { flex-direction: column; gap: 0; }
     #image-viewer-wrap {
       position: relative;
       width: 90vw;
@@ -560,7 +657,6 @@
       position: absolute;
       transform-origin: 0 0;
       display: block;
-      /* size/position set by JS */
     }
     #image-viewer-bar {
       display: flex;
@@ -631,17 +727,23 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Char status badge */
-    .status-badge {
-      font-size: 9px;
-      padding: 1px 5px;
-      border-radius: 8px;
-      border: 1px solid;
-      letter-spacing: 0.05em;
+    /* Add location row */
+    .add-location-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
     }
-    .status-alive { border-color: var(--green); color: var(--green); }
-    .status-dead { border-color: var(--red); color: var(--red); }
-    .status-unknown { border-color: var(--text3); color: var(--text3); }
+    .add-location-row input {
+      flex: 1;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-family: inherit;
+    }
+    .add-location-row input:focus { outline: none; border-color: var(--accent2); }
   </style>
 </head>
 <body>
@@ -663,19 +765,18 @@
   <button class="tab-btn" onclick="switchTab('settings')">⚙ 設定</button>
 </div>
 
-<!-- ═══════════════════════════════════════════ -->
-<!-- TAB: TIMELINE                              -->
-<!-- ═══════════════════════════════════════════ -->
+<!-- ═══ TAB: TIMELINE ═══ -->
 <div id="tab-timeline" class="tab-panel active">
   <div id="timeline-toolbar">
     <button class="toolbar-btn primary" onclick="openAddCharModal()">＋ キャラクター追加</button>
+    <button class="toolbar-btn event-btn" onclick="openAddEventRowModal()">📅 イベント行追加</button>
     <button class="toolbar-btn" onclick="collapseAllRooms()">全折りたたみ</button>
     <button class="toolbar-btn" onclick="expandAllRooms()">全展開</button>
     <span class="toolbar-label">|</span>
     <span class="toolbar-label">凡例：</span>
     <span class="toolbar-label"><span style="color:var(--accent)">●</span> 場所</span>
-    <span class="toolbar-label"><span style="color:var(--teal)">●</span> 入手情報あり</span>
-    <span class="ml-auto toolbar-label text-muted" id="table-hint">セルをクリックして編集 / 部屋名をクリックで折りたたみ</span>
+    <span class="toolbar-label"><span style="color:var(--teal)">●</span> 情報あり</span>
+    <span class="ml-auto toolbar-label text-muted" id="table-hint">セルをクリックして編集</span>
   </div>
   <div id="timeline-wrap">
     <table id="timeline-table">
@@ -689,22 +790,18 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════ -->
-<!-- TAB: RESOURCES                             -->
-<!-- ═══════════════════════════════════════════ -->
+<!-- ═══ TAB: RESOURCES ═══ -->
 <div id="tab-resources" class="tab-panel">
   <div id="resources-panel">
     <div id="resources-toolbar">
       <h2 style="font-size:14px;color:var(--accent);letter-spacing:.1em;">資料一覧</h2>
       <button class="toolbar-btn primary" onclick="openAddResourceModal()">＋ 資料を追加</button>
     </div>
-
     <div class="setup-note" style="margin-bottom:20px;">
       <strong style="color:var(--accent)">画像の追加方法：</strong><br>
       GitHubリポジトリに画像をアップロード → ファイルを開いて「Raw」ボタンのURLをコピー → 「＋ 資料を追加」に貼り付け<br>
       <span style="color:var(--text3)">または Imgur などの画像サービスのURLをそのまま貼ってもOKです</span>
     </div>
-
     <div class="resources-grid" id="resources-grid">
       <div class="empty-state" id="resources-empty">
         資料がまだありません。<br>「＋ 資料を追加」からURLを貼り付けてください。
@@ -713,19 +810,19 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════ -->
-<!-- TAB: SETTINGS                              -->
-<!-- ═══════════════════════════════════════════ -->
+<!-- ═══ TAB: SETTINGS ═══ -->
 <div id="tab-settings" class="tab-panel">
-  <div style="padding:24px;max-width:600px;overflow-y:auto;height:100%;">
+  <div style="padding:24px;max-width:640px;overflow-y:auto;height:100%;">
     <h2 style="font-size:14px;color:var(--accent);letter-spacing:.1em;margin-bottom:16px;">⚙ 設定</h2>
 
     <div class="form-group">
-      <label>Firebase 設定（変更するとデータは引き続きFirebaseに保存されます）</label>
+      <label>Firebase 設定</label>
       <button class="toolbar-btn" onclick="openSetupModal()" style="margin-top:6px;">Firebase設定を変更</button>
     </div>
 
-    <div class="form-group" style="margin-top:20px;">
+    <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+
+    <div class="form-group">
       <label>タイムライン開始時刻</label>
       <input type="text" id="tl-start" placeholder="例: D0 15:00" style="max-width:200px;">
     </div>
@@ -733,28 +830,43 @@
       <label>タイムライン終了時刻</label>
       <input type="text" id="tl-end" placeholder="例: D1 11:00" style="max-width:200px;">
     </div>
-    <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-top:4px;margin-bottom:20px;">
       <button class="toolbar-btn primary" onclick="applyTimeRange()">反映する</button>
       <span id="tl-error" style="color:var(--red);font-size:12px;display:none;"></span>
     </div>
 
-    <div style="margin-top:20px;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;">
+    <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+
+    <!-- ── Location list ── -->
+    <div class="form-group">
+      <label style="font-size:12px;color:var(--accent);letter-spacing:.08em;">📍 場所リスト（カード編集でプルダウン候補として使用）</label>
+      <div class="location-tag-list" id="location-tag-list">
+        <span style="color:var(--text3);font-size:11px;">まだ場所が登録されていません</span>
+      </div>
+      <div class="add-location-row">
+        <input type="text" id="new-location-input" placeholder="場所名を入力（例：食堂車、1A室）"
+               onkeydown="if(event.key==='Enter')addLocation()">
+        <button class="toolbar-btn primary" onclick="addLocation()">追加</button>
+      </div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+
+    <div style="padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;">
       <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">データ操作</div>
-      <button class="toolbar-btn" onclick="exportData()" style="margin-right:8px;">データをJSONでエクスポート</button>
+      <button class="toolbar-btn" onclick="exportData()" style="margin-right:8px;">JSONでエクスポート</button>
       <button class="toolbar-btn" onclick="document.getElementById('import-input').click()">JSONからインポート</button>
       <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
     </div>
 
     <div style="margin-top:20px;font-size:11px;color:var(--text3);line-height:1.8;">
-      <div>バージョン: 1.0.0</div>
+      <div>バージョン: 2.0.0</div>
       <div>ウィルマゼア急行の一番長い運行記録 — PL用タイムライン管理ツール</div>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════ -->
-<!-- MODALS                                     -->
-<!-- ═══════════════════════════════════════════ -->
+<!-- ═══ MODALS ═══ -->
 
 <!-- Setup / Firebase Config Modal -->
 <div class="modal-overlay" id="setup-modal">
@@ -827,8 +939,15 @@
       <div class="form-row">
         <div class="form-group">
           <label>📍 場所・位置</label>
-          <input type="text" id="cell-location" placeholder="例: 食堂車、1A室、廊下など">
+          <input type="text" id="cell-location" list="location-datalist" placeholder="例: 食堂車、1A室、廊下など">
+          <datalist id="location-datalist"></datalist>
         </div>
+        <div class="form-group">
+          <label>🕐 詳細時刻（例: 15:23）</label>
+          <input type="text" id="cell-time-detail" placeholder="HH:MM">
+        </div>
+      </div>
+      <div class="form-row" id="cell-status-row">
         <div class="form-group">
           <label>⚡ 状態</label>
           <select id="cell-status">
@@ -839,6 +958,9 @@
             <option value="unconscious">意識不明</option>
             <option value="suspicious">要注目</option>
           </select>
+        </div>
+        <div class="form-group" style="display:flex;align-items:flex-end;">
+          <span style="font-size:11px;color:var(--text3);padding-bottom:8px;">状態を設定するとキャラクター名欄の色が変わります</span>
         </div>
       </div>
       <div class="form-group">
@@ -875,33 +997,50 @@
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label>名前</label>
-        <input type="text" id="new-char-name" placeholder="キャラクター名">
+        <label>名前 / ラベル</label>
+        <input type="text" id="new-char-name" placeholder="キャラクター名 または イベント行のラベル">
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>役割</label>
-          <select id="new-char-role">
-            <option value="PC">PC（探索者）</option>
-            <option value="NPC">NPC</option>
-            <option value="乗務員">乗務員</option>
-            <option value="容疑者">容疑者</option>
-          </select>
+      <div id="char-regular-fields">
+        <div class="form-row">
+          <div class="form-group">
+            <label>役割</label>
+            <select id="new-char-role">
+              <option value="PC">PC（探索者）</option>
+              <option value="NPC">NPC</option>
+              <option value="乗務員">乗務員</option>
+              <option value="容疑者">容疑者</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>カラー</label>
+            <input type="color" id="new-char-color" value="#888888" style="height:36px;padding:2px 4px;">
+          </div>
         </div>
-        <div class="form-group">
-          <label>カラー</label>
-          <input type="color" id="new-char-color" value="#888888" style="height:36px;padding:2px 4px;">
+        <div class="form-row">
+          <div class="form-group">
+            <label>生存状態（初期値）</label>
+            <select id="new-char-status">
+              <option value="">未設定</option>
+              <option value="alive">生存</option>
+              <option value="dead">死亡</option>
+              <option value="missing">行方不明</option>
+              <option value="unconscious">意識不明</option>
+              <option value="suspicious">要注目</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>メモ（職業・関係など）</label>
+            <input type="text" id="new-char-note" placeholder="例：車掌、宝飾行商人など">
+          </div>
         </div>
       </div>
       <div class="form-group">
-        <label>所属部屋</label>
-        <select id="new-char-room">
-          <!-- dynamically filled -->
-        </select>
+        <label>所属グループ</label>
+        <select id="new-char-room" onchange="onRoomSelectChange()"></select>
       </div>
-      <div class="form-group">
-        <label>メモ（職業・関係など）</label>
-        <input type="text" id="new-char-note" placeholder="例：車掌、宝飾行商人など">
+      <div class="form-group" id="new-room-name-group" style="display:none;">
+        <label>新しいグループの名前</label>
+        <input type="text" id="new-room-name-input" placeholder="例: 4A、食堂車、乗務員室など">
       </div>
     </div>
     <div class="modal-footer">
@@ -949,7 +1088,7 @@
     <button class="zoom-btn" onclick="zoomBy(0.25)" title="拡大">＋</button>
     <span id="zoom-level-label">100%</span>
     <button class="zoom-btn" onclick="zoomBy(-0.25)" title="縮小">－</button>
-    <button class="zoom-btn" onclick="zoomReset()" title="リセット（ダブルクリックでも可）">⤢</button>
+    <button class="zoom-btn" onclick="zoomReset()" title="リセット">⤢</button>
     <a id="image-modal-dl" href="" target="_blank" class="toolbar-btn" style="text-decoration:none;">別タブで開く</a>
     <button class="toolbar-btn" onclick="closeModal('image-modal')">閉じる</button>
   </div>
@@ -968,7 +1107,7 @@
 // CONSTANTS & DEFAULT DATA
 // ═══════════════════════════════════════════════════
 
-let TIME_SLOTS = buildTimeSlots(0, 15, 1, 11); // デフォルト: D0 15:00 〜 D1 11:00
+let TIME_SLOTS = buildTimeSlots(0, 15, 1, 11);
 
 function buildTimeSlots(startDay, startHour, endDay, endHour) {
   const slots = [];
@@ -983,7 +1122,6 @@ function buildTimeSlots(startDay, startHour, endDay, endHour) {
 }
 
 function parseTimeInput(str) {
-  // "D0 15:00" or "d1 03:00"
   const m = str.trim().match(/^[Dd](\d)\s+(\d{1,2}):\d{2}$/);
   if (!m) return null;
   return { day: parseInt(m[1]), hour: parseInt(m[2]) };
@@ -1011,7 +1149,6 @@ function applyTimeRange() {
   errEl.style.display = 'none';
   TIME_SLOTS = buildTimeSlots(start.day, start.hour, end.day, end.hour);
 
-  // Firebaseに保存（任意）
   if (!isOffline && db) {
     db.ref('config/timeRange').set({ startStr, endStr });
   } else {
@@ -1023,104 +1160,85 @@ function applyTimeRange() {
 }
 
 const AVAILABLE_TAGS = [
-  { id: 'key', label: '重要', color: '#e74c3c' },
-  { id: 'alibi', label: 'アリバイ', color: '#3498db' },
-  { id: 'suspicious', label: '要注目', color: '#e67e22' },
-  { id: 'info', label: '情報収集', color: '#3ca696' },
-  { id: 'npc_talk', label: 'NPC会話', color: '#9b59b6' },
-  { id: 'event', label: 'イベント', color: '#c8922a' },
-  { id: 'confirmed', label: '確認済', color: '#27ae60' },
-  { id: 'unconfirmed', label: '未確認', color: '#7f8c8d' },
+  { id: 'key',         label: '重要',    color: '#e74c3c' },
+  { id: 'alibi',       label: 'アリバイ', color: '#3498db' },
+  { id: 'suspicious',  label: '要注目',  color: '#e67e22' },
+  { id: 'info',        label: '情報収集', color: '#3ca696' },
+  { id: 'npc_talk',    label: 'NPC会話', color: '#9b59b6' },
+  { id: 'event',       label: 'イベント', color: '#c8922a' },
+  { id: 'confirmed',   label: '確認済',  color: '#27ae60' },
+  { id: 'unconfirmed', label: '未確認',  color: '#7f8c8d' },
 ];
+
+const STATUS_LABELS = {
+  alive: '生存', dead: '死亡', missing: '行方不明',
+  unconscious: '意識不明', suspicious: '要注目',
+};
 
 const DEFAULT_ROOMS = [
   {
     id: 'room_1a', name: '1A — 探索者・ウィルマゼア', color: '#4a9eff', collapsed: false,
     chars: [
-      { id: 'cranky', name: 'クランキー・ウィルマゼア', color: '#aaaaaa', role: 'NPC', note: '依頼人の孫・友人' },
-      { id: 'liam', name: 'リアム', color: '#b4534b', role: 'PC', note: '探索者' },
-      { id: 'mason', name: 'メイソン', color: '#3ca696', role: 'PC', note: '探索者' },
-      { id: 'mildred', name: 'ミルドレッド', color: '#ffb009', role: 'PC', note: '探索者' },
+      { id: 'cranky',  name: 'クランキー・ウィルマゼア', color: '#aaaaaa', role: 'NPC', note: '依頼人の孫・友人', status: '' },
+      { id: 'liam',    name: 'リアム',   color: '#b4534b', role: 'PC',  note: '探索者', status: '' },
+      { id: 'mason',   name: 'メイソン', color: '#3ca696', role: 'PC',  note: '探索者', status: '' },
+      { id: 'mildred', name: 'ミルドレッド', color: '#ffb009', role: 'PC', note: '探索者', status: '' },
     ]
   },
   {
     id: 'room_1b', name: '1B — ロイヤル家', color: '#9b59b6', collapsed: false,
     chars: [
-      { id: 'wiroel', name: 'ワイロエル・ロイヤル', color: '#9b59b6', role: 'NPC', note: '' },
-      { id: 'ugwis', name: 'ウグウィス・ロイヤル', color: '#9b59b6', role: 'NPC', note: '' },
-      { id: 'george', name: 'ジョージ・ロイヤル', color: '#9b59b6', role: 'NPC', note: '' },
-      { id: 'maria', name: 'マリア・ロイヤル', color: '#9b59b6', role: 'NPC', note: '' },
+      { id: 'wiroel', name: 'ワイロエル・ロイヤル', color: '#9b59b6', role: 'NPC', note: '', status: '' },
+      { id: 'ugwis',  name: 'ウグウィス・ロイヤル', color: '#9b59b6', role: 'NPC', note: '', status: '' },
+      { id: 'george', name: 'ジョージ・ロイヤル',   color: '#9b59b6', role: 'NPC', note: '', status: '' },
+      { id: 'maria',  name: 'マリア・ロイヤル',     color: '#9b59b6', role: 'NPC', note: '', status: '' },
     ]
   },
   {
     id: 'room_2a', name: '2A — ファーマー家', color: '#27ae60', collapsed: true,
     chars: [
-      { id: 'tract', name: 'トラクト・ファーマー', color: '#27ae60', role: 'NPC', note: '' },
-      { id: 'chlora', name: 'クロラ・ファーマー', color: '#27ae60', role: 'NPC', note: '' },
+      { id: 'tract',  name: 'トラクト・ファーマー', color: '#27ae60', role: 'NPC', note: '', status: '' },
+      { id: 'chlora', name: 'クロラ・ファーマー',   color: '#27ae60', role: 'NPC', note: '', status: '' },
     ]
   },
-  {
-    id: 'room_2b', name: '2B', color: '#7f8c8d', collapsed: true,
-    chars: [
-      { id: 'hiko', name: 'ヒコ・クラベ', color: '#7f8c8d', role: 'NPC', note: '' },
-    ]
-  },
-  {
-    id: 'room_2c', name: '2C', color: '#7f8c8d', collapsed: true,
-    chars: [
-      { id: 'sissel', name: 'シセル・フローレン', color: '#7f8c8d', role: 'NPC', note: '' },
-    ]
-  },
-  {
-    id: 'room_2d', name: '2D', color: '#7f8c8d', collapsed: true,
-    chars: [
-      { id: 'cloud', name: 'クラウド・C・エンジャー', color: '#7f8c8d', role: 'NPC', note: '' },
-    ]
-  },
+  { id: 'room_2b', name: '2B', color: '#7f8c8d', collapsed: true,
+    chars: [{ id: 'hiko', name: 'ヒコ・クラベ', color: '#7f8c8d', role: 'NPC', note: '', status: '' }] },
+  { id: 'room_2c', name: '2C', color: '#7f8c8d', collapsed: true,
+    chars: [{ id: 'sissel', name: 'シセル・フローレン', color: '#7f8c8d', role: 'NPC', note: '', status: '' }] },
+  { id: 'room_2d', name: '2D', color: '#7f8c8d', collapsed: true,
+    chars: [{ id: 'cloud', name: 'クラウド・C・エンジャー', color: '#7f8c8d', role: 'NPC', note: '', status: '' }] },
   {
     id: 'room_3a', name: '3A', color: '#e67e22', collapsed: true,
     chars: [
-      { id: 'ragnar', name: 'ラグナシー・ディンバー', color: '#e67e22', role: 'NPC', note: '' },
-      { id: 'lip', name: 'リップ・ホワイトノイズ', color: '#e67e22', role: 'NPC', note: '' },
+      { id: 'ragnar', name: 'ラグナシー・ディンバー', color: '#e67e22', role: 'NPC', note: '', status: '' },
+      { id: 'lip',    name: 'リップ・ホワイトノイズ', color: '#e67e22', role: 'NPC', note: '', status: '' },
     ]
   },
-  {
-    id: 'room_3c', name: '3C', color: '#7f8c8d', collapsed: true,
-    chars: [
-      { id: 'green', name: 'グリーン・ハンショット', color: '#7f8c8d', role: 'NPC', note: '' },
-    ]
-  },
-  {
-    id: 'room_3d', name: '3D', color: '#7f8c8d', collapsed: true,
-    chars: [
-      { id: 'natura', name: 'ナチュラ・バーエ', color: '#7f8c8d', role: 'NPC', note: '' },
-    ]
-  },
+  { id: 'room_3c', name: '3C', color: '#7f8c8d', collapsed: true,
+    chars: [{ id: 'green', name: 'グリーン・ハンショット', color: '#7f8c8d', role: 'NPC', note: '', status: '' }] },
+  { id: 'room_3d', name: '3D', color: '#7f8c8d', collapsed: true,
+    chars: [{ id: 'natura', name: 'ナチュラ・バーエ', color: '#7f8c8d', role: 'NPC', note: '', status: '' }] },
   {
     id: 'room_3e', name: '3E', color: '#1abc9c', collapsed: true,
     chars: [
-      { id: 'neil', name: 'ニール・ラップトップ', color: '#1abc9c', role: 'NPC', note: '宝飾行商人' },
-      { id: 'jewel', name: 'ジュエル・ライダー', color: '#1abc9c', role: 'NPC', note: '' },
+      { id: 'neil',  name: 'ニール・ラップトップ', color: '#1abc9c', role: 'NPC', note: '宝飾行商人', status: '' },
+      { id: 'jewel', name: 'ジュエル・ライダー',   color: '#1abc9c', role: 'NPC', note: '', status: '' },
     ]
   },
-  {
-    id: 'room_3f', name: '3F', color: '#7f8c8d', collapsed: true,
-    chars: [
-      { id: 'hosobo', name: 'ホソボ・ソウルフル', color: '#7f8c8d', role: 'NPC', note: '' },
-    ]
-  },
+  { id: 'room_3f', name: '3F', color: '#7f8c8d', collapsed: true,
+    chars: [{ id: 'hosobo', name: 'ホソボ・ソウルフル', color: '#7f8c8d', role: 'NPC', note: '', status: '' }] },
   {
     id: 'room_crew', name: '乗務員', color: '#c0392b', collapsed: true,
     chars: [
-      { id: 'thomas', name: 'トーマス・ネップル', color: '#c0392b', role: '乗務員', note: '車掌' },
-      { id: 'sheri', name: 'シェリ・デュース', color: '#c0392b', role: '乗務員', note: '機関士' },
-      { id: 'loco', name: 'ロコモット・レインズ', color: '#c0392b', role: '乗務員', note: '副機関士' },
-      { id: 'sophy', name: 'ソフィ・クリアリン', color: '#c0392b', role: '乗務員', note: '料理長' },
-      { id: 'fran', name: 'フラン・バックマン', color: '#c0392b', role: '乗務員', note: '調理師' },
-      { id: 'saucer', name: 'ソーサー・S・プレッシャー', color: '#c0392b', role: '乗務員', note: 'バリスタ' },
-      { id: 'queen', name: 'クイーン・グラファイト', color: '#c0392b', role: '乗務員', note: '助仕' },
-      { id: 'jaffer', name: 'ジャッファ・フラーレン', color: '#c0392b', role: '乗務員', note: '客室乗務員' },
-      { id: 'kings', name: 'キングス・カーボン', color: '#c0392b', role: '乗務員', note: '客室乗務員' },
+      { id: 'thomas', name: 'トーマス・ネップル',      color: '#c0392b', role: '乗務員', note: '車掌',     status: '' },
+      { id: 'sheri',  name: 'シェリ・デュース',         color: '#c0392b', role: '乗務員', note: '機関士',   status: '' },
+      { id: 'loco',   name: 'ロコモット・レインズ',     color: '#c0392b', role: '乗務員', note: '副機関士', status: '' },
+      { id: 'sophy',  name: 'ソフィ・クリアリン',       color: '#c0392b', role: '乗務員', note: '料理長',   status: '' },
+      { id: 'fran',   name: 'フラン・バックマン',       color: '#c0392b', role: '乗務員', note: '調理師',   status: '' },
+      { id: 'saucer', name: 'ソーサー・S・プレッシャー', color: '#c0392b', role: '乗務員', note: 'バリスタ', status: '' },
+      { id: 'queen',  name: 'クイーン・グラファイト',   color: '#c0392b', role: '乗務員', note: '助仕',     status: '' },
+      { id: 'jaffer', name: 'ジャッファ・フラーレン',   color: '#c0392b', role: '乗務員', note: '客室乗務員', status: '' },
+      { id: 'kings',  name: 'キングス・カーボン',       color: '#c0392b', role: '乗務員', note: '客室乗務員', status: '' },
     ]
   },
 ];
@@ -1131,11 +1249,81 @@ const DEFAULT_ROOMS = [
 
 let db = null;
 let rooms = JSON.parse(JSON.stringify(DEFAULT_ROOMS));
-let timelineData = {}; // { charId_slotKey: { location, action, info, notes, tags, status } }
-let resources = {};   // { resourceId: { name, url, type, uploadedAt } }
-let editingCell = null; // { charId, slotKey, charName, slotLabel }
+
+// ★ timelineData[charId][slotKey] = { location, action, info, notes, status, tags, timeDetail, updatedAt }
+let timelineData = {};
+
+let resources = {};
+let locationList = [];
+let editingCell = null;
 let isOffline = false;
 let activeTags = new Set();
+
+// Drag state
+let dragSrc = null; // { roomId, charIdx }
+
+// ═══════════════════════════════════════════════════
+// NORMALIZE HELPERS (Firebase array ↔ object)
+// ═══════════════════════════════════════════════════
+
+function normalizeRooms(val) {
+  if (!val) return JSON.parse(JSON.stringify(DEFAULT_ROOMS));
+  const arr = Array.isArray(val) ? val : Object.values(val);
+  return arr.filter(Boolean).map(room => {
+    let chars = room.chars;
+    if (chars) {
+      chars = Array.isArray(chars) ? chars : Object.values(chars);
+      chars = chars.filter(Boolean);
+    } else {
+      chars = [];
+    }
+    return { ...room, chars };
+  });
+}
+
+// Migrate old flat timeline format (charId_slotKey) to new nested format (charId/slotKey)
+function normalizeTimeline(val) {
+  if (!val) return {};
+  const keys = Object.keys(val);
+  if (keys.length === 0) return {};
+
+  // Detect old format: any key matching charId_dNhN pattern (value is an object with location/action etc.)
+  const oldFormatKey = keys.find(k => {
+    const m = k.match(/^(.+)_(d\d+h\d+)$/);
+    return m && val[k] && typeof val[k] === 'object' && ('location' in val[k] || 'action' in val[k]);
+  });
+
+  if (oldFormatKey) {
+    // Convert old flat format to nested
+    const newData = {};
+    keys.forEach(k => {
+      const m = k.match(/^(.+)_(d\d+h\d+)$/);
+      if (m) {
+        const charId = m[1];
+        const slotKey = m[2];
+        if (!newData[charId]) newData[charId] = {};
+        newData[charId][slotKey] = val[k];
+      }
+    });
+    // Write migrated data back to Firebase
+    if (!isOffline && db) {
+      db.ref('timeline').set(newData);
+    }
+    return newData;
+  }
+
+  // New format: values are objects of slotKey→data
+  const result = {};
+  keys.forEach(charId => {
+    if (val[charId] && typeof val[charId] === 'object') {
+      const slots = val[charId];
+      result[charId] = Array.isArray(slots)
+        ? Object.fromEntries(slots.filter(Boolean).map((v, i) => [i, v]))
+        : slots;
+    }
+  });
+  return result;
+}
 
 // ═══════════════════════════════════════════════════
 // FIREBASE INIT
@@ -1161,18 +1349,30 @@ function initFirebase(cfg) {
       }
     });
 
-    // Listen for rooms config
+    // Load location list
+    db.ref('config/locations').on('value', snap => {
+      const val = snap.val();
+      if (val) {
+        locationList = Array.isArray(val) ? val : Object.values(val);
+      } else {
+        locationList = [];
+      }
+      renderLocationList();
+      updateLocationDatalist();
+    });
+
+    // Listen for rooms
     db.ref('rooms').on('value', snap => {
       const val = snap.val();
       if (val) {
-        rooms = val;
+        rooms = normalizeRooms(val);
         renderTimeline();
       }
     });
 
-    // Listen for timeline data
+    // Listen for timeline data (nested format)
     db.ref('timeline').on('value', snap => {
-      timelineData = snap.val() || {};
+      timelineData = normalizeTimeline(snap.val());
       renderCells();
       setSyncStatus('ok', '同期済');
     });
@@ -1196,21 +1396,24 @@ function initOffline() {
   rooms = JSON.parse(JSON.stringify(DEFAULT_ROOMS));
   timelineData = {};
   resources = {};
+  locationList = [];
 
-  // Load from sessionStorage as temp storage (no localStorage per preference)
   const saved = sessionStorage.getItem('wex_timeline');
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
-      timelineData = parsed.timeline || {};
+      timelineData = normalizeTimeline(parsed.timeline || {});
       resources = parsed.resources || {};
-      if (parsed.rooms) rooms = parsed.rooms;
+      locationList = parsed.locationList || [];
+      if (parsed.rooms) rooms = normalizeRooms(parsed.rooms);
     } catch(e) {}
   }
 
   setSyncStatus('error', 'オフライン');
   renderTimeline();
   renderResources();
+  renderLocationList();
+  updateLocationDatalist();
 }
 
 function saveOffline() {
@@ -1219,6 +1422,7 @@ function saveOffline() {
     timeline: timelineData,
     resources,
     rooms,
+    locationList,
   }));
 }
 
@@ -1242,13 +1446,13 @@ function loadSavedConfig() {
 
 function saveFirebaseConfig() {
   const cfg = {
-    apiKey: document.getElementById('cfg-apiKey').value.trim(),
-    authDomain: document.getElementById('cfg-authDomain').value.trim(),
-    databaseURL: document.getElementById('cfg-databaseURL').value.trim(),
-    projectId: document.getElementById('cfg-projectId').value.trim(),
-    storageBucket: document.getElementById('cfg-storageBucket').value.trim(),
+    apiKey:            document.getElementById('cfg-apiKey').value.trim(),
+    authDomain:        document.getElementById('cfg-authDomain').value.trim(),
+    databaseURL:       document.getElementById('cfg-databaseURL').value.trim(),
+    projectId:         document.getElementById('cfg-projectId').value.trim(),
+    storageBucket:     document.getElementById('cfg-storageBucket').value.trim(),
     messagingSenderId: document.getElementById('cfg-messagingSenderId').value.trim(),
-    appId: document.getElementById('cfg-appId').value.trim(),
+    appId:             document.getElementById('cfg-appId').value.trim(),
   };
 
   if (!cfg.apiKey || !cfg.databaseURL) {
@@ -1261,11 +1465,8 @@ function saveFirebaseConfig() {
   if (ok) {
     localStorage.setItem('wex_firebase_cfg', JSON.stringify(cfg));
     document.getElementById('setup-modal').classList.remove('open');
-    // Push default rooms if none exist yet
     db.ref('rooms').once('value').then(snap => {
-      if (!snap.val()) {
-        db.ref('rooms').set(DEFAULT_ROOMS);
-      }
+      if (!snap.val()) db.ref('rooms').set(DEFAULT_ROOMS);
     });
   } else {
     document.getElementById('setup-error').style.display = 'block';
@@ -1302,12 +1503,11 @@ function renderTimeline() {
 
 function renderTimeHeader() {
   const row = document.getElementById('time-header-row');
-  // Remove all but first th
   while (row.children.length > 1) row.removeChild(row.lastChild);
 
   TIME_SLOTS.forEach(slot => {
     const th = document.createElement('th');
-    th.className = 'time-header' + (slot.hour === 0 && slot.day === 1 ? ' day-change' : '');
+    th.className = 'time-header' + (slot.hour === 0 && slot.day > 0 ? ' day-change' : '');
     th.innerHTML = `<span class="day-label">${slot.day === 0 ? '出発日' : '翌日'}</span><span class="hour-label">${slot.label}</span>`;
     row.appendChild(th);
   });
@@ -1318,50 +1518,142 @@ function renderTimelineBody() {
   tbody.innerHTML = '';
 
   rooms.forEach((room, ri) => {
-    // Room header row
+    const isEvent = !!room.isEventRoom;
+
+    // ── Room header row: 2-cell structure for sticky name ──
     const headerRow = document.createElement('tr');
     headerRow.className = 'room-header-row' + (room.collapsed ? ' collapsed' : '');
     headerRow.dataset.roomId = room.id;
-    headerRow.innerHTML = `<td colspan="${TIME_SLOTS.length + 1}" style="color:${room.color}">
-      <span class="room-toggle">▼</span> ${room.name}
-      <span style="color:var(--text3);font-size:10px;font-weight:normal;margin-left:8px;">(${room.chars.length}名)</span>
-    </td>`;
-    headerRow.addEventListener('click', () => toggleRoom(room.id));
+
+    const nameTd = document.createElement('td');
+    nameTd.className = 'col-name room-name-cell';
+    nameTd.style.color = room.color;
+    nameTd.innerHTML =
+      `<span class="room-toggle">▼</span>${escHtml(room.name)}` +
+      `<span style="color:var(--text3);font-size:10px;font-weight:normal;margin-left:8px;">(${room.chars.length})</span>`;
+    nameTd.addEventListener('click', () => toggleRoom(room.id));
+
+    const spacerTd = document.createElement('td');
+    spacerTd.className = 'room-spacer-cell';
+    spacerTd.colSpan = TIME_SLOTS.length;
+    spacerTd.addEventListener('click', () => toggleRoom(room.id));
+
+    headerRow.appendChild(nameTd);
+    headerRow.appendChild(spacerTd);
     tbody.appendChild(headerRow);
 
-    // Character rows
+    // ── Character / Event rows ──
     room.chars.forEach((char, ci) => {
+      const isEventRow = !!char.isEvent;
       const charRow = document.createElement('tr');
-      charRow.className = 'char-row' + (room.collapsed ? ' collapsed' : '');
+      charRow.className = 'char-row' +
+        (room.collapsed ? ' collapsed' : '') +
+        (isEventRow ? ' event-row' : '') +
+        (char.status ? ` char-status-${char.status}` : '');
       charRow.dataset.charId = char.id;
       charRow.dataset.roomId = room.id;
 
-      // Name cell
+      // ── Name cell ──
       const nameTd = document.createElement('td');
       nameTd.className = 'col-name';
-      nameTd.innerHTML = `<div class="name-cell">
-        <div class="char-name">
-          <span class="char-dot" style="background:${char.color}"></span>
-          ${escHtml(char.name)}
-          <button class="edit-char-btn" title="編集" onclick="event.stopPropagation(); openEditCharModal('${room.id}', '${char.id}')">✏</button>
-        </div>
-        <div class="char-role">${escHtml(char.role)}${char.note ? ' · ' + escHtml(char.note) : ''}</div>
-      </div>`;
+
+      if (isEventRow) {
+        nameTd.innerHTML = `<div class="name-cell">
+          <div class="name-cell-top">
+            <span style="font-size:14px;flex-shrink:0;">📅</span>
+            <span class="char-name-text" style="color:var(--accent);">${escHtml(char.name)}</span>
+            <div class="char-controls">
+              <button class="char-ctrl-btn" title="上へ" onclick="event.stopPropagation();moveChar('${escHtml(room.id)}',${ci},-1)">▲</button>
+              <button class="char-ctrl-btn" title="下へ" onclick="event.stopPropagation();moveChar('${escHtml(room.id)}',${ci},1)">▼</button>
+              <button class="char-ctrl-btn" title="編集" onclick="event.stopPropagation();openEditCharModal('${escHtml(room.id)}','${escHtml(char.id)}')">✏</button>
+            </div>
+          </div>
+        </div>`;
+      } else {
+        const statusBadge = char.status
+          ? `<span class="status-badge status-${char.status}">${STATUS_LABELS[char.status] || char.status}</span>`
+          : '';
+        nameTd.innerHTML = `<div class="name-cell">
+          <div class="name-cell-top">
+            <span class="char-dot" style="background:${escHtml(char.color)}"></span>
+            <span class="char-name-text">${escHtml(char.name)}</span>
+            ${statusBadge}
+            <div class="char-controls">
+              <button class="char-ctrl-btn" title="上へ" onclick="event.stopPropagation();moveChar('${escHtml(room.id)}',${ci},-1)">▲</button>
+              <button class="char-ctrl-btn" title="下へ" onclick="event.stopPropagation();moveChar('${escHtml(room.id)}',${ci},1)">▼</button>
+              <button class="char-ctrl-btn" title="編集" onclick="event.stopPropagation();openEditCharModal('${escHtml(room.id)}','${escHtml(char.id)}')">✏</button>
+            </div>
+          </div>
+          <div class="char-role">${escHtml(char.role || '')}${char.note ? ' · ' + escHtml(char.note) : ''}</div>
+        </div>`;
+      }
       charRow.appendChild(nameTd);
 
-      // Time cells
+      // ── Time cells ──
       TIME_SLOTS.forEach(slot => {
         const td = document.createElement('td');
-        td.className = 'timeline-cell' + (slot.hour === 0 && slot.day === 1 ? ' day-change' : '');
-        td.dataset.charId = char.id;
+        td.className = 'timeline-cell' + (slot.hour === 0 && slot.day > 0 ? ' day-change' : '');
+        td.dataset.charId   = char.id;
         td.dataset.charName = char.name;
-        td.dataset.charColor = char.color;
-        td.dataset.slotKey = slot.key;
+        td.dataset.charColor = char.color || '#888888';
+        td.dataset.slotKey  = slot.key;
         td.dataset.slotLabel = slot.label;
-        td.dataset.slotDay = slot.day;
-        td.innerHTML = `<div class="cell-content" id="cell-${char.id}-${slot.key}"></div>`;
-        td.addEventListener('click', () => openCellModal(char.id, char.name, char.color, slot.key, slot.label, slot.day));
+        td.dataset.slotDay  = slot.day;
+        td.dataset.isEvent  = isEventRow ? '1' : '';
+        td.innerHTML = `<div class="cell-content" id="cell-${escHtml(char.id)}-${slot.key}"></div>`;
+        td.addEventListener('click', () => openCellModal(
+          char.id, char.name, char.color || '#888888',
+          slot.key, slot.label, slot.day, isEventRow
+        ));
         charRow.appendChild(td);
+      });
+
+      // ── Drag-over indicator ──
+      charRow.addEventListener('dragover', e => {
+        if (!dragSrc) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        document.querySelectorAll('.char-row').forEach(r => r.classList.remove('drag-over'));
+        charRow.classList.add('drag-over');
+      });
+      charRow.addEventListener('drop', e => {
+        e.preventDefault();
+        if (!dragSrc) return;
+        document.querySelectorAll('.char-row').forEach(r => r.classList.remove('drag-over'));
+        const srcRoom = rooms.find(r => r.id === dragSrc.roomId);
+        const tgtRoom = rooms.find(r => r.id === room.id);
+        if (!srcRoom || !tgtRoom) return;
+        if (dragSrc.roomId === room.id && dragSrc.charIdx === ci) return;
+
+        const [movedChar] = srcRoom.chars.splice(dragSrc.charIdx, 1);
+        const insertIdx = (dragSrc.roomId === room.id && dragSrc.charIdx < ci) ? ci - 1 : ci;
+        tgtRoom.chars.splice(insertIdx, 0, movedChar);
+
+        dragSrc = null;
+        persistRooms();
+        renderTimelineBody();
+        renderCells();
+      });
+
+      // Drag source
+      charRow.draggable = false;
+      const moveUpBtn = nameTd.querySelector('.char-ctrl-btn[title="上へ"]');
+      if (moveUpBtn) {
+        // Enable drag only from ▲▼ controls (mousedown trick)
+        nameTd.querySelectorAll('.char-ctrl-btn[title="上へ"], .char-ctrl-btn[title="下へ"]').forEach(btn => {
+          btn.addEventListener('mousedown', () => { charRow.draggable = true; });
+        });
+      }
+      charRow.addEventListener('dragstart', e => {
+        dragSrc = { roomId: room.id, charIdx: ci };
+        e.dataTransfer.effectAllowed = 'move';
+        setTimeout(() => charRow.classList.add('dragging'), 0);
+      });
+      charRow.addEventListener('dragend', () => {
+        charRow.draggable = false;
+        charRow.classList.remove('dragging');
+        document.querySelectorAll('.char-row').forEach(r => r.classList.remove('drag-over'));
+        dragSrc = null;
       });
 
       tbody.appendChild(charRow);
@@ -1370,38 +1662,39 @@ function renderTimelineBody() {
 }
 
 function renderCells() {
-  // Update all cells with current data
-  Object.entries(timelineData).forEach(([key, data]) => {
-    const [charId, ...slotParts] = key.split('_');
-    const slotKey = slotParts.join('_');
-    const el = document.getElementById(`cell-${charId}-${slotKey}`);
-    if (!el) return;
-    updateCellDisplay(el, data);
+  // Clear all cells first
+  document.querySelectorAll('.timeline-cell').forEach(td => {
+    const el = document.getElementById(`cell-${td.dataset.charId}-${td.dataset.slotKey}`);
+    if (el) { el.innerHTML = ''; td.classList.remove('has-data'); }
   });
 
-  // Clear cells that have no data
-  document.querySelectorAll('.timeline-cell').forEach(td => {
-    const key = `${td.dataset.charId}_${td.dataset.slotKey}`;
-    const el = document.getElementById(`cell-${td.dataset.charId}-${td.dataset.slotKey}`);
-    if (!el) return;
-    if (!timelineData[key]) {
-      el.innerHTML = '';
-      td.classList.remove('has-data');
-    }
+  // Populate cells from timelineData[charId][slotKey]
+  Object.entries(timelineData).forEach(([charId, slots]) => {
+    if (!slots || typeof slots !== 'object') return;
+    Object.entries(slots).forEach(([slotKey, data]) => {
+      const el = document.getElementById(`cell-${charId}-${slotKey}`);
+      if (el) updateCellDisplay(el, data);
+    });
   });
+
+  // Update character status badges from timeline if no char-level status set
+  // (optional: the char-level status is already shown; this is just for rendering)
 }
 
 function updateCellDisplay(el, data) {
-  if (!data || (!data.location && !data.action && !data.info && !data.notes)) {
+  if (!data || (!data.location && !data.action && !data.info && !data.notes && !data.timeDetail)) {
     el.innerHTML = '';
-    el.closest('.timeline-cell').classList.remove('has-data');
+    const td = el.closest('.timeline-cell');
+    if (td) td.classList.remove('has-data');
     return;
   }
+
   el.closest('.timeline-cell').classList.add('has-data');
   let html = '';
-  if (data.location) html += `<div class="cell-location">📍 ${escHtml(data.location)}</div>`;
-  if (data.action) html += `<div class="cell-action">${escHtml(data.action)}</div>`;
-  if (data.info) html += `<div class="cell-has-info" title="情報あり"></div>`;
+  if (data.timeDetail) html += `<span class="cell-time-detail">${escHtml(data.timeDetail)}</span>`;
+  if (data.location)   html += `<div class="cell-location">📍 ${escHtml(data.location)}</div>`;
+  if (data.action)     html += `<div class="cell-action">${escHtml(data.action)}</div>`;
+  if (data.info)       html += `<div class="cell-has-info" title="情報あり"></div>`;
   el.innerHTML = html;
 }
 
@@ -1414,7 +1707,6 @@ function toggleRoom(roomId) {
   if (!room) return;
   room.collapsed = !room.collapsed;
 
-  // Update DOM
   document.querySelectorAll(`[data-room-id="${roomId}"]`).forEach(el => {
     if (el.classList.contains('room-header-row')) {
       el.classList.toggle('collapsed', room.collapsed);
@@ -1423,22 +1715,17 @@ function toggleRoom(roomId) {
     }
   });
 
-  // Persist room config
   persistRooms();
 }
 
 function collapseAllRooms() {
   rooms.forEach(r => r.collapsed = true);
-  renderTimelineBody();
-  renderCells();
-  persistRooms();
+  renderTimelineBody(); renderCells(); persistRooms();
 }
 
 function expandAllRooms() {
   rooms.forEach(r => r.collapsed = false);
-  renderTimelineBody();
-  renderCells();
-  persistRooms();
+  renderTimelineBody(); renderCells(); persistRooms();
 }
 
 function persistRooms() {
@@ -1450,29 +1737,50 @@ function persistRooms() {
 }
 
 // ═══════════════════════════════════════════════════
+// CHARACTER REORDERING
+// ═══════════════════════════════════════════════════
+
+function moveChar(roomId, charIdx, direction) {
+  const room = rooms.find(r => r.id === roomId);
+  if (!room) return;
+  const newIdx = charIdx + direction;
+  if (newIdx < 0 || newIdx >= room.chars.length) return;
+  const [char] = room.chars.splice(charIdx, 1);
+  room.chars.splice(newIdx, 0, char);
+  persistRooms();
+  renderTimelineBody();
+  renderCells();
+}
+
+// ═══════════════════════════════════════════════════
 // CELL MODAL
 // ═══════════════════════════════════════════════════
 
-function openCellModal(charId, charName, charColor, slotKey, slotLabel, slotDay) {
-  editingCell = { charId, charName, charColor, slotKey, slotLabel, slotDay };
-  const key = `${charId}_${slotKey}`;
-  const data = timelineData[key] || {};
+function openCellModal(charId, charName, charColor, slotKey, slotLabel, slotDay, isEvent) {
+  editingCell = { charId, charName, charColor, slotKey, slotLabel, slotDay, isEvent };
+  const data = (timelineData[charId] || {})[slotKey] || {};
 
   document.getElementById('cell-modal-title').innerHTML =
-    `<span style="color:${charColor}">●</span> ${charName}`;
+    isEvent
+      ? `📅 ${escHtml(charName)}`
+      : `<span style="color:${charColor}">●</span> ${escHtml(charName)}`;
   document.getElementById('cell-modal-sub').textContent =
     `${slotDay === 0 ? '出発日' : '翌日'} ${slotLabel}`;
 
-  document.getElementById('cell-location').value = data.location || '';
-  document.getElementById('cell-action').value = data.action || '';
-  document.getElementById('cell-info').value = data.info || '';
-  document.getElementById('cell-notes').value = data.notes || '';
-  document.getElementById('cell-status').value = data.status || '';
+  document.getElementById('cell-location').value    = data.location   || '';
+  document.getElementById('cell-time-detail').value = data.timeDetail || '';
+  document.getElementById('cell-action').value      = data.action     || '';
+  document.getElementById('cell-info').value        = data.info       || '';
+  document.getElementById('cell-notes').value       = data.notes      || '';
+  document.getElementById('cell-status').value      = data.status     || '';
 
-  // Render tags
+  // Hide status row for event rows
+  document.getElementById('cell-status-row').style.display = isEvent ? 'none' : '';
+
   activeTags = new Set(data.tags || []);
   renderTagList();
 
+  updateLocationDatalist();
   document.getElementById('cell-modal').classList.add('open');
   setTimeout(() => document.getElementById('cell-location').focus(), 50);
 }
@@ -1498,37 +1806,37 @@ function renderTagList() {
 
 function saveCell() {
   if (!editingCell) return;
-  const key = `${editingCell.charId}_${editingCell.slotKey}`;
+  const { charId, slotKey } = editingCell;
   const data = {
-    location: document.getElementById('cell-location').value.trim(),
-    action: document.getElementById('cell-action').value.trim(),
-    info: document.getElementById('cell-info').value.trim(),
-    notes: document.getElementById('cell-notes').value.trim(),
-    status: document.getElementById('cell-status').value,
-    tags: [...activeTags],
-    updatedAt: Date.now(),
+    location:   document.getElementById('cell-location').value.trim(),
+    timeDetail: document.getElementById('cell-time-detail').value.trim(),
+    action:     document.getElementById('cell-action').value.trim(),
+    info:       document.getElementById('cell-info').value.trim(),
+    notes:      document.getElementById('cell-notes').value.trim(),
+    status:     editingCell.isEvent ? '' : document.getElementById('cell-status').value,
+    tags:       [...activeTags],
+    updatedAt:  Date.now(),
   };
 
-  // Remove empty entries
-  if (!data.location && !data.action && !data.info && !data.notes && !data.status) {
-    clearCellData(key);
+  if (!data.location && !data.timeDetail && !data.action && !data.info && !data.notes && !data.status) {
+    clearCellData(charId, slotKey);
     closeModal('cell-modal');
     return;
   }
 
-  timelineData[key] = data;
+  if (!timelineData[charId]) timelineData[charId] = {};
+  timelineData[charId][slotKey] = data;
 
   if (!isOffline && db) {
     setSyncStatus('syncing', '保存中…');
-    db.ref(`timeline/${key}`).set(data)
+    db.ref(`timeline/${charId}/${slotKey}`).set(data)
       .then(() => setSyncStatus('ok', '同期済'))
       .catch(() => setSyncStatus('error', '保存失敗'));
   } else {
     saveOffline();
   }
 
-  // Update cell display immediately
-  const el = document.getElementById(`cell-${editingCell.charId}-${editingCell.slotKey}`);
+  const el = document.getElementById(`cell-${charId}-${slotKey}`);
   if (el) updateCellDisplay(el, data);
 
   closeModal('cell-modal');
@@ -1536,19 +1844,20 @@ function saveCell() {
 
 function clearCell() {
   if (!editingCell) return;
-  const key = `${editingCell.charId}_${editingCell.slotKey}`;
-  clearCellData(key);
+  clearCellData(editingCell.charId, editingCell.slotKey);
   closeModal('cell-modal');
 }
 
-function clearCellData(key) {
-  delete timelineData[key];
+function clearCellData(charId, slotKey) {
+  if (timelineData[charId]) {
+    delete timelineData[charId][slotKey];
+    if (Object.keys(timelineData[charId]).length === 0) delete timelineData[charId];
+  }
   if (!isOffline && db) {
-    db.ref(`timeline/${key}`).remove();
+    db.ref(`timeline/${charId}/${slotKey}`).remove();
   } else {
     saveOffline();
   }
-  const [charId, slotKey] = key.split(/_(.+)/);
   const el = document.getElementById(`cell-${charId}-${slotKey}`);
   if (el) updateCellDisplay(el, null);
 }
@@ -1557,13 +1866,14 @@ function clearCellData(key) {
 // ADD / EDIT CHARACTER MODAL
 // ═══════════════════════════════════════════════════
 
-let charModalMode = 'add'; // 'add' or 'edit'
-let editingCharInfo = null; // { roomId, charId }
+let charModalMode = 'add'; // 'add' | 'edit' | 'event'
+let editingCharInfo = null;
 
-function fillRoomSelect(selectedRoomId) {
+function fillRoomSelect(selectedRoomId, includeEventRooms) {
   const sel = document.getElementById('new-char-room');
   sel.innerHTML = '';
   rooms.forEach(r => {
+    if (!includeEventRooms && r.isEventRoom) return; // skip event rooms for regular chars
     const opt = document.createElement('option');
     opt.value = r.id;
     opt.textContent = r.name;
@@ -1572,8 +1882,13 @@ function fillRoomSelect(selectedRoomId) {
   });
   const newOpt = document.createElement('option');
   newOpt.value = '__new__';
-  newOpt.textContent = '＋ 新しい部屋を追加…';
+  newOpt.textContent = '＋ 新しいグループを追加…';
   sel.appendChild(newOpt);
+}
+
+function onRoomSelectChange() {
+  const val = document.getElementById('new-char-room').value;
+  document.getElementById('new-room-name-group').style.display = val === '__new__' ? 'block' : 'none';
 }
 
 function openAddCharModal() {
@@ -1582,11 +1897,44 @@ function openAddCharModal() {
   document.getElementById('char-modal-title').textContent = '＋ キャラクター追加';
   document.getElementById('char-save-btn').textContent = '追加';
   document.getElementById('char-delete-btn').style.display = 'none';
+  document.getElementById('char-regular-fields').style.display = '';
   document.getElementById('new-char-name').value = '';
   document.getElementById('new-char-note').value = '';
   document.getElementById('new-char-color').value = '#888888';
   document.getElementById('new-char-role').value = 'NPC';
-  fillRoomSelect(null);
+  document.getElementById('new-char-status').value = '';
+  document.getElementById('new-room-name-group').style.display = 'none';
+  fillRoomSelect(null, false);
+  document.getElementById('char-modal').classList.add('open');
+  setTimeout(() => document.getElementById('new-char-name').focus(), 50);
+}
+
+function openAddEventRowModal() {
+  charModalMode = 'event';
+  editingCharInfo = null;
+  document.getElementById('char-modal-title').textContent = '📅 イベント行を追加';
+  document.getElementById('char-save-btn').textContent = '追加';
+  document.getElementById('char-delete-btn').style.display = 'none';
+  document.getElementById('char-regular-fields').style.display = 'none';
+  document.getElementById('new-char-name').value = '';
+  document.getElementById('new-room-name-group').style.display = 'none';
+
+  // Fill room select with event rooms only (or all rooms)
+  const sel = document.getElementById('new-char-room');
+  sel.innerHTML = '';
+  const evRoom = rooms.find(r => r.id === 'room_events');
+  if (evRoom) {
+    const opt = document.createElement('option');
+    opt.value = 'room_events';
+    opt.textContent = evRoom.name;
+    opt.selected = true;
+    sel.appendChild(opt);
+  }
+  const newOpt = document.createElement('option');
+  newOpt.value = '__new_event__';
+  newOpt.textContent = '＋ 新しいイベントグループを追加…';
+  sel.appendChild(newOpt);
+
   document.getElementById('char-modal').classList.add('open');
   setTimeout(() => document.getElementById('new-char-name').focus(), 50);
 }
@@ -1597,26 +1945,32 @@ function openEditCharModal(roomId, charId) {
   const char = room.chars.find(c => c.id === charId);
   if (!char) return;
 
-  charModalMode = 'edit';
+  const isEv = !!char.isEvent;
+  charModalMode = isEv ? 'event' : 'edit';
   editingCharInfo = { roomId, charId };
 
-  document.getElementById('char-modal-title').textContent = '✏ キャラクター編集';
+  document.getElementById('char-modal-title').textContent = isEv ? '📅 イベント行を編集' : '✏ キャラクター編集';
   document.getElementById('char-save-btn').textContent = '保存';
   document.getElementById('char-delete-btn').style.display = 'block';
+  document.getElementById('char-regular-fields').style.display = isEv ? 'none' : '';
 
-  document.getElementById('new-char-name').value = char.name;
-  document.getElementById('new-char-note').value = char.note || '';
+  document.getElementById('new-char-name').value  = char.name;
+  document.getElementById('new-char-note').value  = char.note  || '';
   document.getElementById('new-char-color').value = char.color || '#888888';
-  document.getElementById('new-char-role').value = char.role || 'NPC';
-  fillRoomSelect(roomId);
+  document.getElementById('new-char-role').value  = char.role  || 'NPC';
+  document.getElementById('new-char-status').value = char.status || '';
+  document.getElementById('new-room-name-group').style.display = 'none';
+  fillRoomSelect(roomId, isEv);
 
   document.getElementById('char-modal').classList.add('open');
   setTimeout(() => document.getElementById('new-char-name').focus(), 50);
 }
 
 function saveCharModal() {
-  if (charModalMode === 'edit') {
+  if (charModalMode === 'edit' || charModalMode === 'event' && editingCharInfo) {
     saveEditChar();
+  } else if (charModalMode === 'event') {
+    saveNewEventRow();
   } else {
     saveNewChar();
   }
@@ -1626,18 +1980,20 @@ function saveNewChar() {
   const name = document.getElementById('new-char-name').value.trim();
   if (!name) { alert('名前を入力してください'); return; }
 
-  const role = document.getElementById('new-char-role').value;
-  const color = document.getElementById('new-char-color').value;
-  const note = document.getElementById('new-char-note').value.trim();
+  const role   = document.getElementById('new-char-role').value;
+  const color  = document.getElementById('new-char-color').value;
+  const note   = document.getElementById('new-char-note').value.trim();
+  const status = document.getElementById('new-char-status').value;
   const roomId = document.getElementById('new-char-room').value;
 
-  const charId = 'char_' + Date.now();
-  const newChar = { id: charId, name, role, color, note };
+  const charId  = 'c' + Date.now(); // no underscore in ID to avoid key collisions
+  const newChar = { id: charId, name, role, color, note, status };
 
   if (roomId === '__new__') {
+    const roomName = document.getElementById('new-room-name-input').value.trim() || name + 'のグループ';
     const newRoom = {
-      id: 'room_' + Date.now(),
-      name: name + ' の部屋',
+      id: 'r' + Date.now(),
+      name: roomName,
       color,
       collapsed: false,
       chars: [newChar]
@@ -1654,28 +2010,68 @@ function saveNewChar() {
   closeModal('char-modal');
 }
 
+function saveNewEventRow() {
+  const name = document.getElementById('new-char-name').value.trim();
+  if (!name) { alert('ラベルを入力してください'); return; }
+
+  const roomSel = document.getElementById('new-char-room').value;
+  const charId  = 'e' + Date.now();
+  const newChar = { id: charId, name, isEvent: true, color: '#c8922a' };
+
+  if (roomSel === '__new_event__') {
+    const newRoom = {
+      id: 'revt' + Date.now(),
+      name: 'イベント ' + name,
+      isEventRoom: true,
+      color: '#c8922a',
+      collapsed: false,
+      chars: [newChar]
+    };
+    rooms.unshift(newRoom);
+  } else {
+    // Use existing events room, or create default
+    let evRoom = rooms.find(r => r.id === roomSel || r.id === 'room_events');
+    if (!evRoom) {
+      evRoom = {
+        id: 'room_events', name: '全体イベント',
+        isEventRoom: true, color: '#c8922a', collapsed: false, chars: []
+      };
+      rooms.unshift(evRoom);
+    }
+    evRoom.chars.push(newChar);
+  }
+
+  persistRooms();
+  renderTimelineBody();
+  renderCells();
+  closeModal('char-modal');
+}
+
 function saveEditChar() {
   if (!editingCharInfo) return;
   const { roomId, charId } = editingCharInfo;
 
-  const name = document.getElementById('new-char-name').value.trim();
+  const name   = document.getElementById('new-char-name').value.trim();
   if (!name) { alert('名前を入力してください'); return; }
 
-  const role = document.getElementById('new-char-role').value;
-  const color = document.getElementById('new-char-color').value;
-  const note = document.getElementById('new-char-note').value.trim();
-  const newRoomId = document.getElementById('new-char-room').value;
-
-  // Find char in current room
   const oldRoom = rooms.find(r => r.id === roomId);
   if (!oldRoom) return;
   const charIdx = oldRoom.chars.findIndex(c => c.id === charId);
   if (charIdx === -1) return;
 
-  const updatedChar = { id: charId, name, role, color, note };
+  const isEv = !!oldRoom.chars[charIdx].isEvent;
+  const updatedChar = isEv
+    ? { id: charId, name, isEvent: true, color: '#c8922a' }
+    : {
+        id: charId, name,
+        role:   document.getElementById('new-char-role').value,
+        color:  document.getElementById('new-char-color').value,
+        note:   document.getElementById('new-char-note').value.trim(),
+        status: document.getElementById('new-char-status').value,
+      };
 
-  if (newRoomId !== roomId && newRoomId !== '__new__') {
-    // Move to different room
+  const newRoomId = document.getElementById('new-char-room').value;
+  if (newRoomId !== roomId && newRoomId !== '__new__' && newRoomId !== '__new_event__') {
     oldRoom.chars.splice(charIdx, 1);
     const newRoom = rooms.find(r => r.id === newRoomId);
     if (newRoom) newRoom.chars.push(updatedChar);
@@ -1692,7 +2088,7 @@ function saveEditChar() {
 function deleteChar() {
   if (!editingCharInfo) return;
   const { roomId, charId } = editingCharInfo;
-  if (!confirm('このキャラクターを削除しますか？\nタイムラインのデータは残ります。')) return;
+  if (!confirm('このキャラクター / イベント行を削除しますか？\nタイムラインのデータは残ります。')) return;
 
   const room = rooms.find(r => r.id === roomId);
   if (!room) return;
@@ -1705,7 +2101,56 @@ function deleteChar() {
 }
 
 // ═══════════════════════════════════════════════════
-// RESOURCES（URL貼り付け方式）
+// LOCATION LIST
+// ═══════════════════════════════════════════════════
+
+function addLocation() {
+  const val = document.getElementById('new-location-input').value.trim();
+  if (!val) return;
+  if (locationList.includes(val)) {
+    document.getElementById('new-location-input').value = '';
+    return;
+  }
+  locationList.push(val);
+  document.getElementById('new-location-input').value = '';
+  saveLocationList();
+  renderLocationList();
+  updateLocationDatalist();
+}
+
+function removeLocation(loc) {
+  locationList = locationList.filter(l => l !== loc);
+  saveLocationList();
+  renderLocationList();
+  updateLocationDatalist();
+}
+
+function saveLocationList() {
+  if (!isOffline && db) {
+    db.ref('config/locations').set(locationList.length ? locationList : null);
+  } else {
+    saveOffline();
+  }
+}
+
+function renderLocationList() {
+  const container = document.getElementById('location-tag-list');
+  if (!locationList.length) {
+    container.innerHTML = '<span style="color:var(--text3);font-size:11px;">まだ場所が登録されていません</span>';
+    return;
+  }
+  container.innerHTML = locationList.map(loc =>
+    `<span class="location-tag">${escHtml(loc)}<button class="location-tag-remove" onclick="removeLocation('${escHtml(loc)}')">×</button></span>`
+  ).join('');
+}
+
+function updateLocationDatalist() {
+  const dl = document.getElementById('location-datalist');
+  dl.innerHTML = locationList.map(loc => `<option value="${escHtml(loc)}">`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// RESOURCES
 // ═══════════════════════════════════════════════════
 
 function openAddResourceModal() {
@@ -1721,8 +2166,8 @@ function openAddResourceModal() {
 function previewResourceUrl() {
   const url = document.getElementById('res-url').value.trim();
   const wrap = document.getElementById('res-preview-wrap');
-  const img = document.getElementById('res-preview');
-  const err = document.getElementById('res-preview-err');
+  const img  = document.getElementById('res-preview');
+  const err  = document.getElementById('res-preview-err');
   if (!url) { wrap.style.display = 'none'; return; }
   wrap.style.display = 'block';
   img.style.display = 'block';
@@ -1732,11 +2177,11 @@ function previewResourceUrl() {
 
 function saveResource() {
   const name = document.getElementById('res-name').value.trim();
-  const url = document.getElementById('res-url').value.trim();
+  const url  = document.getElementById('res-url').value.trim();
   if (!name) { alert('資料名を入力してください'); return; }
-  if (!url) { alert('URLを入力してください'); return; }
+  if (!url)  { alert('URLを入力してください'); return; }
 
-  const id = 'res_' + Date.now();
+  const id  = 'res_' + Date.now();
   const res = { id, name, url, type: 'image', uploadedAt: Date.now() };
 
   resources[id] = res;
@@ -1761,7 +2206,7 @@ function deleteResource(id) {
 }
 
 function renderResources() {
-  const grid = document.getElementById('resources-grid');
+  const grid  = document.getElementById('resources-grid');
   const empty = document.getElementById('resources-empty');
   const items = Object.values(resources).sort((a, b) => b.uploadedAt - a.uploadedAt);
 
@@ -1777,7 +2222,6 @@ function renderResources() {
     card.className = 'resource-card';
     card.onclick = () => openImageModal(res);
 
-    // typeが 'image' または 'image/...' どちらでも画像として扱う
     const isImage = res.type && res.type.startsWith('image');
     const thumbHtml = isImage
       ? `<img class="resource-thumb" src="${escHtml(res.url)}" alt="${escHtml(res.name)}" loading="lazy"
@@ -1787,7 +2231,7 @@ function renderResources() {
 
     const date = new Date(res.uploadedAt).toLocaleDateString('ja-JP');
     card.innerHTML = `${thumbHtml}
-      <button class="resource-delete-btn" title="削除" onclick="event.stopPropagation(); deleteResource('${escHtml(res.id)}')">×</button>
+      <button class="resource-delete-btn" title="削除" onclick="event.stopPropagation();deleteResource('${escHtml(res.id)}')">×</button>
       <div class="resource-info">
         <div class="resource-name">${escHtml(res.name)}</div>
         <div class="resource-date">${date}</div>
@@ -1796,20 +2240,13 @@ function renderResources() {
   });
 }
 
-// ── Image viewer with zoom/pan ──
-let imgScale = 1;
-let imgX = 0;
-let imgY = 0;
-let imgNaturalW = 0;
-let imgNaturalH = 0;
-let isDragging = false;
-let dragStartX = 0;
-let dragStartY = 0;
-let dragOriginX = 0;
-let dragOriginY = 0;
+// ─── Image viewer with zoom/pan ───
+let imgScale = 1, imgX = 0, imgY = 0;
+let imgNaturalW = 0, imgNaturalH = 0;
+let isDragging = false, dragStartX = 0, dragStartY = 0, dragOriginX = 0, dragOriginY = 0;
 
 function openImageModal(res) {
-  const img = document.getElementById('image-modal-img');
+  const img    = document.getElementById('image-modal-img');
   const nameEl = document.getElementById('image-modal-name');
   const dlLink = document.getElementById('image-modal-dl');
 
@@ -1818,16 +2255,11 @@ function openImageModal(res) {
 
   if (res.type && res.type.startsWith('image')) {
     img.style.display = 'block';
-    img.onload = () => {
-      imgNaturalW = img.naturalWidth;
-      imgNaturalH = img.naturalHeight;
-      zoomReset();
-    };
+    img.onload = () => { imgNaturalW = img.naturalWidth; imgNaturalH = img.naturalHeight; zoomReset(); };
     img.src = res.url;
   } else {
     img.style.display = 'none';
   }
-
   document.getElementById('image-modal').classList.add('open');
 }
 
@@ -1835,20 +2267,16 @@ function getWrap() { return document.getElementById('image-viewer-wrap'); }
 function getImg()  { return document.getElementById('image-modal-img'); }
 
 function applyTransform() {
-  getImg().style.transform = `translate(${imgX}px, ${imgY}px) scale(${imgScale})`;
+  getImg().style.transform = `translate(${imgX}px,${imgY}px) scale(${imgScale})`;
   document.getElementById('zoom-level-label').textContent = Math.round(imgScale * 100) + '%';
 }
 
 function zoomReset() {
   const wrap = getWrap();
-  const ww = wrap.clientWidth;
-  const wh = wrap.clientHeight;
+  const ww = wrap.clientWidth, wh = wrap.clientHeight;
   if (!imgNaturalW || !imgNaturalH) { imgScale = 1; imgX = 0; imgY = 0; applyTransform(); return; }
-
-  // fit to wrap
-  const scaleW = ww / imgNaturalW;
-  const scaleH = wh / imgNaturalH;
-  imgScale = Math.min(scaleW, scaleH, 1); // never upscale beyond 100%
+  const scaleW = ww / imgNaturalW, scaleH = wh / imgNaturalH;
+  imgScale = Math.min(scaleW, scaleH, 1);
   imgX = (ww - imgNaturalW * imgScale) / 2;
   imgY = (wh - imgNaturalH * imgScale) / 2;
   applyTransform();
@@ -1856,49 +2284,34 @@ function zoomReset() {
 
 function zoomBy(delta) {
   const wrap = getWrap();
-  const cx = wrap.clientWidth / 2;
-  const cy = wrap.clientHeight / 2;
-  zoomAt(cx, cy, delta);
+  zoomAt(wrap.clientWidth / 2, wrap.clientHeight / 2, delta);
 }
 
 function zoomAt(cx, cy, delta) {
-  const minScale = 0.1;
-  const maxScale = 8;
-  const newScale = Math.min(maxScale, Math.max(minScale, imgScale + delta));
+  const newScale = Math.min(8, Math.max(0.1, imgScale + delta));
   const ratio = newScale / imgScale;
-  // zoom towards cursor point
   imgX = cx - (cx - imgX) * ratio;
   imgY = cy - (cy - imgY) * ratio;
   imgScale = newScale;
   applyTransform();
 }
 
-// Scroll to zoom
 (function setupImageViewer() {
-  document.addEventListener('DOMContentLoaded', () => {});
-  // Run after DOM is ready - attach at startup
   function attach() {
     const wrap = document.getElementById('image-viewer-wrap');
     if (!wrap) { setTimeout(attach, 100); return; }
 
-    // Wheel zoom
     wrap.addEventListener('wheel', e => {
       e.preventDefault();
       const rect = wrap.getBoundingClientRect();
-      const cx = e.clientX - rect.left;
-      const cy = e.clientY - rect.top;
-      const delta = e.deltaY < 0 ? 0.15 : -0.15;
-      zoomAt(cx, cy, delta);
+      zoomAt(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 0.15 : -0.15);
     }, { passive: false });
 
-    // Drag to pan
     wrap.addEventListener('mousedown', e => {
       if (e.button !== 0) return;
       isDragging = true;
-      dragStartX = e.clientX;
-      dragStartY = e.clientY;
-      dragOriginX = imgX;
-      dragOriginY = imgY;
+      dragStartX = e.clientX; dragStartY = e.clientY;
+      dragOriginX = imgX; dragOriginY = imgY;
       wrap.classList.add('dragging');
       e.preventDefault();
     });
@@ -1913,11 +2326,7 @@ function zoomAt(cx, cy, delta) {
       isDragging = false;
       getWrap().classList.remove('dragging');
     });
-
-    // Double-click to reset
     wrap.addEventListener('dblclick', () => zoomReset());
-
-    // Click outside wrap to close
     document.getElementById('image-modal').addEventListener('click', e => {
       if (e.target === document.getElementById('image-modal')) closeModal('image-modal');
     });
@@ -1934,7 +2343,7 @@ function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   document.querySelectorAll('.tab-btn').forEach(b => {
-    if (b.textContent.toLowerCase().includes(name === 'timeline' ? 'タイムライン' : name === 'resources' ? '資料' : '設定')) {
+    if (b.textContent.includes(name === 'timeline' ? 'タイムライン' : name === 'resources' ? '資料' : '設定')) {
       b.classList.add('active');
     }
   });
@@ -1948,7 +2357,6 @@ function closeModal(id) {
   document.getElementById(id).classList.remove('open');
 }
 
-// Close on overlay click
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', e => {
     if (e.target === overlay && overlay.id !== 'setup-modal') {
@@ -1957,7 +2365,6 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
   });
 });
 
-// Keyboard shortcuts
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     document.querySelectorAll('.modal-overlay.open').forEach(m => {
@@ -1965,8 +2372,7 @@ document.addEventListener('keydown', e => {
     });
   }
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-    const cellModal = document.getElementById('cell-modal');
-    if (cellModal.classList.contains('open')) saveCell();
+    if (document.getElementById('cell-modal').classList.contains('open')) saveCell();
   }
 });
 
@@ -1975,11 +2381,11 @@ document.addEventListener('keydown', e => {
 // ═══════════════════════════════════════════════════
 
 function exportData() {
-  const data = { rooms, timeline: timelineData, resources, exportedAt: Date.now() };
+  const data = { rooms, timeline: timelineData, resources, locationList, exportedAt: Date.now() };
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
   a.href = url;
   a.download = `wex_timeline_${new Date().toISOString().slice(0,10)}.json`;
   a.click();
@@ -1994,12 +2400,18 @@ function importData(event) {
     try {
       const data = JSON.parse(e.target.result);
       if (data.rooms) {
-        rooms = data.rooms;
+        rooms = normalizeRooms(data.rooms);
         if (!isOffline && db) db.ref('rooms').set(rooms);
       }
       if (data.timeline) {
-        timelineData = data.timeline;
+        timelineData = normalizeTimeline(data.timeline);
         if (!isOffline && db) db.ref('timeline').set(timelineData);
+      }
+      if (data.locationList) {
+        locationList = data.locationList;
+        saveLocationList();
+        renderLocationList();
+        updateLocationDatalist();
       }
       renderTimeline();
       alert('インポート完了！');
@@ -2015,8 +2427,8 @@ function importData(event) {
 // ═══════════════════════════════════════════════════
 
 function escHtml(str) {
-  if (!str) return '';
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ═══════════════════════════════════════════════════
@@ -2024,18 +2436,12 @@ function escHtml(str) {
 // ═══════════════════════════════════════════════════
 
 (function init() {
-  // Try to load saved Firebase config
   const cfg = loadSavedConfig();
   if (cfg && cfg.apiKey && cfg.databaseURL) {
     const ok = initFirebase(cfg);
-    if (!ok) {
-      // Config was saved but failed - show setup
-      openSetupModal();
-    }
+    if (!ok) openSetupModal();
   } else {
-    // First time - show setup modal
     openSetupModal();
-    // Render offline immediately so the app is usable
     initOffline();
   }
 })();
