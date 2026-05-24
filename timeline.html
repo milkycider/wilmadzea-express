@@ -1224,8 +1224,9 @@
     }
     .item-card {
       background: var(--bg2); border: 1px solid var(--border);
-      border-radius: 8px; overflow: hidden;
+      border-radius: 8px; overflow-y: auto; overflow-x: hidden;
       display: flex; flex-direction: column;
+      max-height: min(480px, 70vh);
     }
     .item-card-header {
       display: flex; align-items: center; gap: 8px;
