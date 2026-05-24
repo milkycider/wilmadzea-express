@@ -459,7 +459,17 @@
       padding: 0px 4px;
       line-height: 1.6;
     }
-    .timeline-cell.is-explored { border-bottom: 2px solid rgba(39,174,96,0.4); }
+    .timeline-cell.is-explored::after {
+      content: '✔';
+      position: absolute;
+      top: 2px;
+      right: 4px;
+      font-size: 9px;
+      color: rgba(39,174,96,0.95);
+      line-height: 1;
+      pointer-events: none;
+      z-index: 2;
+    }
 
     /* ── マルチループエントリー ── */
     .cell-entry {
@@ -1527,6 +1537,19 @@
       color: var(--text3);
       margin-top: 6px;
     }
+
+    /* ── ドラッグ並び替え ── */
+    .drag-dragging {
+      opacity: 0.35;
+      box-shadow: 0 0 0 2px var(--accent2) !important;
+    }
+    .drag-over-above { border-top: 2px solid var(--accent2) !important; }
+    .drag-over-below { border-bottom: 2px solid var(--accent2) !important; }
+    .dragsort-enabled { cursor: grab; }
+    .dragsort-enabled:active { cursor: grabbing; }
+    .dragsort-enabled * { pointer-events: none; }
+    .dragsort-enabled button,
+    .dragsort-enabled a { pointer-events: auto; }
   </style>
 </head>
 <body>
@@ -1562,7 +1585,7 @@
     <span class="toolbar-label">|</span>
     <span class="toolbar-label">凡例：</span>
     <span class="toolbar-label"><span style="color:var(--accent)">📍</span> 場所</span>
-    <span class="toolbar-label" style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:18px;height:3px;background:rgba(39,174,96,0.7);border-radius:2px;vertical-align:middle;"></span> 探索済み</span>
+    <span class="toolbar-label" style="display:flex;align-items:center;gap:4px;"><span style="color:rgba(39,174,96,0.95);font-size:12px;line-height:1;">✔</span> 探索済み</span>
     <span class="toolbar-label"><span class="cell-badge-loop" style="vertical-align:middle;">L1</span> ループ数</span>
     <span class="toolbar-label">|</span>
     <div id="loop-filter-bar"></div>
@@ -1915,6 +1938,13 @@
         <input type="text" id="new-char-name" placeholder="キャラクター名 または イベント行のラベル">
       </div>
       <div id="char-regular-fields">
+      <div class="form-group" style="margin-bottom:0;">
+        <label style="display:flex;align-items:center;gap:6px;">
+          表示名
+          <span style="font-size:10px;color:var(--text3);font-weight:normal;">（場所タイムラインなど一覧での略称。省略時はフルネーム）</span>
+        </label>
+        <input type="text" id="new-char-displayname" placeholder="例：トラクト、クロラ…">
+      </div>
         <div class="form-row">
           <div class="form-group">
             <label>役割</label>
@@ -2303,6 +2333,8 @@ let timelineData = {};
 let resources = {};
 let locationList = [];
 let notes = {}; // { noteId: { id, title, body, tags, timeRef, charId, createdAt, updatedAt } }
+let notesOrder = [];     // ドラッグ並び替え順 — note ID の配列
+let resourcesOrder = []; // ドラッグ並び替え順 — resource ID の配列
 let charNotes = {}; // { charId: { memo, updatedAt } }
 let items = {}; // { itemId: { id, name, cat, owner, desc, memo, memoUpdatedAt, createdAt } }
 let editingItemId = null;
@@ -2521,6 +2553,16 @@ function initFirebase(cfg) {
       if (locViewMode === 'pos' && document.getElementById('tab-loctimeline').classList.contains('active')) renderLocTimeline();
     });
 
+    db.ref('notesOrder').on('value', snap => {
+      notesOrder = snap.val() || [];
+      if (document.getElementById('tab-notes').classList.contains('active')) renderNotes();
+    });
+
+    db.ref('resourcesOrder').on('value', snap => {
+      resourcesOrder = snap.val() || [];
+      renderResources();
+    });
+
     isOffline = false;
     return true;
   } catch (e) {
@@ -2548,8 +2590,10 @@ function initOffline() {
       notes = parsed.notes || {};
       charNotes = parsed.charNotes || {};
       items = parsed.items || {};
-      locationNotes = parsed.locationNotes || {};
-      positionData  = parsed.positionData  || {};
+      locationNotes  = parsed.locationNotes  || {};
+      positionData   = parsed.positionData   || {};
+      notesOrder     = parsed.notesOrder     || [];
+      resourcesOrder = parsed.resourcesOrder || [];
       if (parsed.rooms) rooms = normalizeRooms(parsed.rooms);
     } catch(e) {}
   }
@@ -2570,6 +2614,8 @@ function saveOffline() {
     locationList,
     notes,
     positionData,
+    notesOrder,
+    resourcesOrder,
   }));
 }
 
@@ -3375,6 +3421,7 @@ function openAddCharModal() {
   document.getElementById('char-delete-btn').style.display = 'none';
   document.getElementById('char-regular-fields').style.display = '';
   document.getElementById('new-char-name').value = '';
+  document.getElementById('new-char-displayname').value = '';
   document.getElementById('new-char-note').value = '';
   document.getElementById('new-char-color').value = '#888888';
   document.getElementById('new-char-role').value = 'NPC';
@@ -3436,11 +3483,12 @@ function openEditCharModal(roomId, charId) {
   document.getElementById('char-delete-btn').style.display = 'block';
   document.getElementById('char-regular-fields').style.display = isEv ? 'none' : '';
 
-  document.getElementById('new-char-name').value  = char.name;
-  document.getElementById('new-char-note').value  = char.note  || '';
-  document.getElementById('new-char-color').value = char.color || '#888888';
-  document.getElementById('new-char-role').value  = char.role  || 'NPC';
-  document.getElementById('new-char-status').value = char.status || '';
+  document.getElementById('new-char-name').value        = char.name;
+  document.getElementById('new-char-displayname').value = char.displayName || '';
+  document.getElementById('new-char-note').value         = char.note  || '';
+  document.getElementById('new-char-color').value        = char.color || '#888888';
+  document.getElementById('new-char-role').value         = char.role  || 'NPC';
+  document.getElementById('new-char-status').value       = char.status || '';
   document.getElementById('new-room-name-group').style.display = 'none';
   fillRoomSelect(roomId, isEv);
 
@@ -3462,14 +3510,15 @@ function saveNewChar() {
   const name = document.getElementById('new-char-name').value.trim();
   if (!name) { alert('名前を入力してください'); return; }
 
-  const role   = document.getElementById('new-char-role').value;
-  const color  = document.getElementById('new-char-color').value;
-  const note   = document.getElementById('new-char-note').value.trim();
-  const status = document.getElementById('new-char-status').value;
-  const roomId = document.getElementById('new-char-room').value;
+  const role        = document.getElementById('new-char-role').value;
+  const color       = document.getElementById('new-char-color').value;
+  const note        = document.getElementById('new-char-note').value.trim();
+  const status      = document.getElementById('new-char-status').value;
+  const displayName = document.getElementById('new-char-displayname').value.trim();
+  const roomId      = document.getElementById('new-char-room').value;
 
   const charId  = 'c' + Date.now(); // no underscore in ID to avoid key collisions
-  const newChar = { id: charId, name, role, color, note, status };
+  const newChar = { id: charId, name, role, color, note, status, ...(displayName ? { displayName } : {}) };
 
   if (roomId === '__new__') {
     const roomName = document.getElementById('new-room-name-input').value.trim() || name + 'のグループ';
@@ -3543,6 +3592,7 @@ function saveEditChar() {
   if (charIdx === -1) return;
 
   const isEv = !!oldRoom.chars[charIdx].isEvent;
+  const _dn  = document.getElementById('new-char-displayname').value.trim();
   const updatedChar = isEv
     ? { id: charId, name, isEvent: true, color: '#c8922a' }
     : {
@@ -3551,6 +3601,7 @@ function saveEditChar() {
         color:  document.getElementById('new-char-color').value,
         note:   document.getElementById('new-char-note').value.trim(),
         status: document.getElementById('new-char-status').value,
+        ...(_dn ? { displayName: _dn } : {}),
       };
 
   const newRoomId = document.getElementById('new-char-room').value;
@@ -3710,23 +3761,36 @@ function deleteResource(id) {
 function renderResources() {
   const grid  = document.getElementById('resources-grid');
   const empty = document.getElementById('resources-empty');
-  const items = Object.values(resources).sort((a, b) => b.uploadedAt - a.uploadedAt);
 
-  if (items.length === 0) {
+  // resourcesOrder 順 → なければアップロード日時降順
+  let itemList = Object.values(resources);
+  if (resourcesOrder.length > 0) {
+    const orderMap = Object.fromEntries(resourcesOrder.map((id, i) => [id, i]));
+    itemList.sort((a, b) => {
+      const ai = orderMap[a.id] !== undefined ? orderMap[a.id] : 999999;
+      const bi = orderMap[b.id] !== undefined ? orderMap[b.id] : 999999;
+      return ai !== bi ? ai - bi : b.uploadedAt - a.uploadedAt;
+    });
+  } else {
+    itemList.sort((a, b) => b.uploadedAt - a.uploadedAt);
+  }
+
+  if (itemList.length === 0) {
     grid.innerHTML = '';
     grid.appendChild(empty);
     return;
   }
 
   grid.innerHTML = '';
-  items.forEach(res => {
+  itemList.forEach(res => {
     const card = document.createElement('div');
     card.className = 'resource-card';
+    card.dataset.resId = res.id;
     card.onclick = () => openImageModal(res);
 
     const isImage = res.type && res.type.startsWith('image');
     const thumbHtml = isImage
-      ? `<img class="resource-thumb" src="${escHtml(res.url)}" alt="${escHtml(res.name)}" loading="lazy"
+      ? `<img class="resource-thumb" src="${escHtml(res.url)}" alt="${escHtml(res.name)}" loading="lazy" draggable="false"
              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
         + `<div class="resource-thumb-placeholder" style="display:none">🖼</div>`
       : `<div class="resource-thumb-placeholder">📄</div>`;
@@ -3740,6 +3804,8 @@ function renderResources() {
       </div>`;
     grid.appendChild(card);
   });
+
+  attachDragSort(grid, '.resource-card', 'resId', saveResourcesOrder);
 }
 
 // ─── Image viewer with zoom/pan ───
@@ -4065,7 +4131,8 @@ function openCharPicker(locName, slotKey, anchorEl) {
 
     const item = document.createElement('div');
     item.className = 'char-picker-item' + (isHere ? ' placed-here' : isOther ? ' placed-other' : '');
-    item.innerHTML = `<span class="char-picker-dot" style="background:${escHtml(ch.color||'#888')}"></span>${escHtml(ch.name)}`;
+    const pickerLabel = ch.displayName ? `${escHtml(ch.displayName)} <span style="color:var(--text3);font-size:10px;">(${escHtml(ch.name)})</span>` : escHtml(ch.name);
+    item.innerHTML = `<span class="char-picker-dot" style="background:${escHtml(ch.color||'#888')}"></span>${pickerLabel}`;
     if (isOther) item.title = `現在: ${placedAt}`;
 
     item.onclick = (e) => {
@@ -4111,10 +4178,10 @@ function renderLocTimeline() {
 
   const hideEmpty = document.getElementById('loctimeline-hide-empty').checked;
 
-  // キャラID→{name,color} マップを構築
+  // キャラID→{name,displayName,color} マップを構築
   const allChars = {};
   rooms.forEach(room => room.chars.forEach(ch => {
-    allChars[ch.id] = { name: ch.name, color: ch.color || '#888' };
+    allChars[ch.id] = { name: ch.name, displayName: ch.displayName || ch.name, color: ch.color || '#888' };
   }));
 
   // locIndex: { locName: { slotKey: [{charId, name, color},...] } }
@@ -4212,7 +4279,8 @@ function renderLocTimeline() {
         if (!slotPos[ch.id]) {
           const tag = document.createElement('span');
           tag.className = 'loc-unknown-tag';
-          const shortName = ch.name.length > 9 ? ch.name.slice(0, 8) + '…' : ch.name;
+          const dname = ch.displayName || ch.name;
+          const shortName = dname.length > 9 ? dname.slice(0, 8) + '…' : dname;
           tag.innerHTML = `<span class="loc-pos-tag-dot" style="background:${escHtml(ch.color||'#888')}"></span>${escHtml(shortName)}`;
           td.appendChild(tag);
         }
@@ -4256,7 +4324,8 @@ function renderLocTimeline() {
           if (slotPos[ch.id] !== locName) return;
           const tag = document.createElement('span');
           tag.className = 'loc-pos-tag';
-          const shortName = ch.name.length > 9 ? ch.name.slice(0, 8) + '…' : ch.name;
+          const dname = ch.displayName || ch.name;
+          const shortName = dname.length > 9 ? dname.slice(0, 8) + '…' : dname;
           tag.innerHTML = `<span class="loc-pos-tag-dot" style="background:${escHtml(ch.color||'#888')}"></span>${escHtml(shortName)}<span class="loc-pos-tag-remove" title="外す">×</span>`;
           tag.querySelector('.loc-pos-tag-remove').onclick = (e) => {
             e.stopPropagation();
@@ -4277,7 +4346,8 @@ function renderLocTimeline() {
           const chip = document.createElement('div');
           chip.className = 'loc-char-chip';
           chip.title = ch.name;
-          const shortName = ch.name.length > 9 ? ch.name.slice(0, 8) + '…' : ch.name;
+          const dname = ch.displayName || ch.name;
+          const shortName = dname.length > 9 ? dname.slice(0, 8) + '…' : dname;
           chip.innerHTML = `<span class="loc-char-dot" style="background:${escHtml(ch.color)}"></span>${escHtml(shortName)}`;
           chip.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -4859,6 +4929,77 @@ function renderCharData() {
   }
 }
 
+// ═══════════════════════════════════════════════════
+// DRAG SORT — 調査メモ・資料一覧 共通
+// ═══════════════════════════════════════════════════
+
+function attachDragSort(container, selector, idAttr, onDrop) {
+  let dragSrc = null;
+
+  container.querySelectorAll(selector).forEach(el => {
+    el.draggable = true;
+    el.classList.add('dragsort-enabled');
+
+    el.addEventListener('dragstart', e => {
+      dragSrc = el;
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => el.classList.add('drag-dragging'), 0);
+    });
+
+    el.addEventListener('dragend', () => {
+      el.classList.remove('drag-dragging');
+      container.querySelectorAll(selector).forEach(c =>
+        c.classList.remove('drag-over-above', 'drag-over-below'));
+      dragSrc = null;
+    });
+
+    el.addEventListener('dragover', e => {
+      if (!dragSrc || dragSrc === el) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      container.querySelectorAll(selector).forEach(c =>
+        c.classList.remove('drag-over-above', 'drag-over-below'));
+      const rect = el.getBoundingClientRect();
+      el.classList.add(e.clientY < rect.top + rect.height / 2
+        ? 'drag-over-above' : 'drag-over-below');
+    });
+
+    el.addEventListener('dragleave', () => {
+      el.classList.remove('drag-over-above', 'drag-over-below');
+    });
+
+    el.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!dragSrc || dragSrc === el) return;
+      el.classList.contains('drag-over-above')
+        ? container.insertBefore(dragSrc, el)
+        : el.after(dragSrc);
+      el.classList.remove('drag-over-above', 'drag-over-below');
+      const newOrder = [...container.querySelectorAll(selector)]
+        .map(c => c.dataset[idAttr]).filter(Boolean);
+      onDrop(newOrder);
+    });
+  });
+}
+
+function saveNotesOrder(orderedIds) {
+  notesOrder = orderedIds;
+  if (!isOffline && db) {
+    db.ref('notesOrder').set(orderedIds);
+  } else {
+    saveOffline();
+  }
+}
+
+function saveResourcesOrder(orderedIds) {
+  resourcesOrder = orderedIds;
+  if (!isOffline && db) {
+    db.ref('resourcesOrder').set(orderedIds);
+  } else {
+    saveOffline();
+  }
+}
+
 function renderNotes() {
   const grid   = document.getElementById('notes-grid');
   const empty  = document.getElementById('notes-empty');
@@ -4873,7 +5014,17 @@ function renderNotes() {
       (n.timeRef|| '').toLowerCase().includes(search)
     );
   }
-  list.sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+  // 検索なしのとき: notesOrder 順 → それ以外は更新日時降順
+  if (!search && notesOrder.length > 0) {
+    const orderMap = Object.fromEntries(notesOrder.map((id, i) => [id, i]));
+    list.sort((a, b) => {
+      const ai = orderMap[a.id] !== undefined ? orderMap[a.id] : 999999;
+      const bi = orderMap[b.id] !== undefined ? orderMap[b.id] : 999999;
+      return ai !== bi ? ai - bi : (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0);
+    });
+  } else {
+    list.sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+  }
 
   // カード以外（empty stateのみ残す）を削除してから追記
   Array.from(grid.children).forEach(el => { if (el.id !== 'notes-empty') el.remove(); });
@@ -4910,6 +5061,11 @@ function renderNotes() {
     card.addEventListener('click', () => openEditNoteModal(note.id));
     grid.appendChild(card);
   });
+
+  // 検索中はドラッグ無効（順序が崩れるため）
+  if (!search) {
+    attachDragSort(grid, '.note-card', 'noteId', saveNotesOrder);
+  }
 }
 
 // ═══════════════════════════════════════════════════
