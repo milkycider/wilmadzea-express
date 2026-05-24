@@ -423,12 +423,12 @@
       padding: 3px 5px;
       vertical-align: top;
       position: relative;
-      transition: background 0.12s;
+      transition: background 0.12s, box-shadow 0.12s;
     }
-    .timeline-cell:hover { background: var(--bg3); }
+    .timeline-cell:hover { background: #252018; box-shadow: inset 0 0 0 1px rgba(200,146,42,0.22); }
     .timeline-cell.day-change { border-left: 2px solid var(--accent2); }
     .timeline-cell.has-data { background: var(--bg3); }
-    .timeline-cell.has-data:hover { background: var(--bg4); }
+    .timeline-cell.has-data:hover { background: #30281b; box-shadow: inset 0 0 0 1px rgba(200,146,42,0.22); }
     /* 探索済み・ループバッジ */
     .cell-badges {
       position: absolute;
@@ -478,7 +478,7 @@
       border-radius: 2px;
       transition: background 0.1s;
     }
-    .cell-entry:hover { background: rgba(255,255,255,0.07); }
+    .cell-entry:hover { background: rgba(255,255,255,0.04); }
     .cell-entry-divider {
       border-bottom: 1px solid rgba(255,255,255,0.09);
       margin-bottom: 1px;
