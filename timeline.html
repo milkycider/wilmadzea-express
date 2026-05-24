@@ -175,10 +175,10 @@
       cursor: grab;
       user-select: none;
     }
-    #timeline-wrap.dragging {
+    #timeline-wrap.dragging, #loctimeline-wrap.dragging {
       cursor: grabbing;
     }
-    #timeline-wrap.dragging * {
+    #timeline-wrap.dragging *, #loctimeline-wrap.dragging * {
       pointer-events: none;
     }
     #timeline-table {
@@ -816,6 +816,8 @@
       flex: 1;
       overflow: auto;
       position: relative;
+      cursor: grab;
+      user-select: none;
     }
     #loctimeline-table {
       border-collapse: collapse;
@@ -4160,8 +4162,7 @@ function escHtml(str) {
 // DRAG SCROLL (timeline-wrap)
 // ═══════════════════════════════════════════════════
 
-(function initDragScroll() {
-  const wrap = document.getElementById('timeline-wrap');
+(function initDragScroll(wrap) {
   if (!wrap) return;
 
   let isDown = false;
@@ -4220,6 +4221,8 @@ function escHtml(str) {
     wrap.scrollLeft = touchScrollLeft - dx;
     wrap.scrollTop  = touchScrollTop  - dy;
   }, { passive: true });
+  initDragScroll(document.getElementById('timeline-wrap'));
+  initDragScroll(document.getElementById('loctimeline-wrap'));
 })();
 
 // ═══════════════════════════════════════════════════
