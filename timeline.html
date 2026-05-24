@@ -292,6 +292,8 @@
     .room-header-row:hover .room-spacer-cell { background: var(--bg4); }
     .room-toggle { margin-right: 8px; display: inline-block; transition: transform 0.2s; }
     .room-header-row.collapsed .room-toggle { transform: rotate(-90deg); }
+    .room-edit-btn { display: none; margin-left: 8px; vertical-align: middle; }
+    .room-header-row:hover .room-edit-btn { display: inline-block; }
 
     /* Character rows */
     .char-row td {
@@ -1101,9 +1103,11 @@
       padding: 6px;
       z-index: 9000;
       display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      max-width: 260px;
+      flex-direction: column;
+      gap: 3px;
+      width: 200px;
+      max-height: 260px;
+      overflow-y: auto;
     }
     .char-picker-item {
       display: flex;
@@ -1839,6 +1843,33 @@
       <button class="toolbar-btn" id="cell-add-loop-modal-btn" onclick="addLoopEntry()" style="color:var(--accent);border-color:rgba(200,146,42,0.5);" title="このスロットに別ループのエントリーを追加">＋ 別ループ</button>
       <button class="toolbar-btn" onclick="closeModal('cell-modal')">キャンセル</button>
       <button class="toolbar-btn primary" onclick="saveCell()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Room Edit Modal -->
+<div class="modal-overlay" id="room-edit-modal">
+  <div class="modal-box" style="max-width:360px;">
+    <div class="modal-header">
+      <h2>グループを編集</h2>
+      <button class="modal-close" onclick="closeModal('room-edit-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>グループ名</label>
+        <input type="text" id="room-edit-name" placeholder="例: 1A — 探索者">
+      </div>
+      <div class="form-group">
+        <label>カラー</label>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <input type="color" id="room-edit-color" style="width:48px;height:32px;padding:2px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);cursor:pointer;">
+          <span id="room-edit-color-hex" style="font-size:12px;color:var(--text2);font-family:monospace;"></span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="toolbar-btn" onclick="closeModal('room-edit-modal')">キャンセル</button>
+      <button class="toolbar-btn primary" onclick="saveEditRoom()">保存</button>
     </div>
   </div>
 </div>
@@ -2621,7 +2652,8 @@ function renderTimelineBody() {
     nameTd.style.color = room.color;
     nameTd.innerHTML =
       `<span class="room-toggle">▼</span>${escHtml(room.name)}` +
-      `<span style="color:var(--text3);font-size:10px;font-weight:normal;margin-left:8px;">(${room.chars.length})</span>`;
+      `<span style="color:var(--text3);font-size:10px;font-weight:normal;margin-left:8px;">(${room.chars.length})</span>` +
+      `<button class="char-ctrl-btn room-edit-btn" title="グループを編集" onclick="event.stopPropagation();openEditRoomModal('${escHtml(room.id)}')">✏</button>`;
     nameTd.addEventListener('click', () => toggleRoom(room.id));
 
     const spacerTd = document.createElement('td');
@@ -3007,6 +3039,44 @@ function persistRooms() {
   } else {
     saveOffline();
   }
+}
+
+// ═══════════════════════════════════════════════════
+// ROOM EDIT
+// ═══════════════════════════════════════════════════
+
+let editingRoomId = null;
+
+function openEditRoomModal(roomId) {
+  const room = rooms.find(r => r.id === roomId);
+  if (!room) return;
+  editingRoomId = roomId;
+  document.getElementById('room-edit-name').value  = room.name  || '';
+  const color = room.color || '#7f8c8d';
+  document.getElementById('room-edit-color').value = color;
+  document.getElementById('room-edit-color-hex').textContent = color;
+  document.getElementById('room-edit-modal').classList.add('open');
+  setTimeout(() => document.getElementById('room-edit-name').focus(), 50);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const colorInput = document.getElementById('room-edit-color');
+  if (colorInput) colorInput.addEventListener('input', () => {
+    document.getElementById('room-edit-color-hex').textContent = colorInput.value;
+  });
+});
+
+function saveEditRoom() {
+  const room = rooms.find(r => r.id === editingRoomId);
+  if (!room) return;
+  const name  = document.getElementById('room-edit-name').value.trim();
+  const color = document.getElementById('room-edit-color').value;
+  if (name)  room.name  = name;
+  if (color) room.color = color;
+  persistRooms();
+  renderTimeline();
+  renderCells();
+  closeModal('room-edit-modal');
 }
 
 // ═══════════════════════════════════════════════════
@@ -3928,11 +3998,12 @@ function openCharPicker(locName, slotKey, anchorEl) {
   closeCharPicker();
   pickerTarget = { locName, slotKey };
 
-  // 全キャラ一覧（roomsの順で）
+  // 全キャラ一覧（キャラクタータイムライン順・イベント行除く）
   const allChars = [];
-  rooms.forEach(room => room.chars.forEach(ch => {
-    if (!ch.isEvent) allChars.push(ch);
-  }));
+  rooms.forEach(room => {
+    if (room.isEvent) return;
+    room.chars.forEach(ch => allChars.push(ch));
+  });
 
   const slotPos = positionData[slotKey] || {};
 
@@ -3962,14 +4033,18 @@ function openCharPicker(locName, slotKey, anchorEl) {
     popup.appendChild(item);
   });
 
-  // ポップアップ位置（アンカーの下）
+  // ポップアップ位置（アンカーの下、画面外にはみ出さないよう調整）
   document.body.appendChild(popup);
   pickerEl = popup;
   const rect = anchorEl.getBoundingClientRect();
+  const ph = popup.offsetHeight;
+  const pw = popup.offsetWidth;
   let top  = rect.bottom + 4;
   let left = rect.left;
-  if (left + 270 > window.innerWidth) left = window.innerWidth - 274;
-  if (top  + 150 > window.innerHeight) top = rect.top - popup.offsetHeight - 4;
+  if (left + pw > window.innerWidth - 8)  left = window.innerWidth - pw - 8;
+  if (left < 8) left = 8;
+  if (top  + ph > window.innerHeight - 8) top  = rect.top - ph - 4;
+  if (top  < 8) top  = 8;
   popup.style.top  = top  + 'px';
   popup.style.left = left + 'px';
 }
@@ -4079,7 +4154,7 @@ function renderLocTimeline() {
 
     // 全キャラIDを収集
     const allCharList = [];
-    rooms.forEach(room => room.chars.forEach(ch => { if (!ch.isEvent) allCharList.push(ch); }));
+    rooms.forEach(room => { if (!room.isEvent) room.chars.forEach(ch => allCharList.push(ch)); });
 
     TIME_SLOTS.forEach(slot => {
       const td = document.createElement('td');
