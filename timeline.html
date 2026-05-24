@@ -1501,6 +1501,18 @@
       <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
     </div>
 
+    <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+
+    <!-- ── データ修復 ── -->
+    <div class="form-group">
+      <label style="font-size:12px;color:var(--accent);letter-spacing:.08em;">🔧 データ修復（孤立タイムラインデータの付け替え）</label>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.7;">
+        どのキャラにも紐付いていない孤立したタイムラインデータを検出し、<br>現在のキャラ・イベント行に付け替えます。
+      </div>
+      <button class="toolbar-btn" onclick="scanOrphanedData()" style="margin-bottom:12px;">🔍 孤立データを検出</button>
+      <div id="orphan-list"></div>
+    </div>
+
     <div style="margin-top:20px;font-size:11px;color:var(--text3);line-height:1.8;">
       <div>バージョン: 2.0.0</div>
       <div>ウィルマゼア急行の一番長い運行記録 — PL用タイムライン管理ツール</div>
@@ -3272,6 +3284,103 @@ function zoomAt(cx, cy, delta) {
 // ═══════════════════════════════════════════════════
 // TAB SWITCHING
 // ═══════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════
+// DATA REPAIR (orphaned timeline data remapping)
+// ═══════════════════════════════════════════════════
+
+function scanOrphanedData() {
+  const container = document.getElementById('orphan-list');
+
+  // 現在のroomsにいる全charIdを収集
+  const knownIds = new Set();
+  rooms.forEach(r => r.chars.forEach(c => knownIds.add(c.id)));
+
+  // timelineDataの中で knownIds にないものが孤立データ
+  const orphans = Object.keys(timelineData).filter(id => !knownIds.has(id));
+
+  if (orphans.length === 0) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--green);padding:8px 0;">孤立したデータは見つかりませんでした。</div>';
+    return;
+  }
+
+  // 全キャラ一覧（付け替え先候補）
+  const allChars = [];
+  rooms.forEach(r => r.chars.forEach(c => allChars.push({ id: c.id, label: r.name + ' — ' + c.name })));
+
+  container.innerHTML = '';
+  orphans.forEach(orphanId => {
+    const slots = timelineData[orphanId] || {};
+    const slotCount = Object.keys(slots).length;
+    // データのサンプル（最初のスロットの場所か行動）
+    const sample = Object.values(slots).find(d => d && (d.location || d.action));
+    const sampleText = sample ? (sample.location || sample.action || '').slice(0, 30) : '（内容不明）';
+
+    const row = document.createElement('div');
+    row.style.cssText = 'background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:8px;';
+
+    const info = document.createElement('div');
+    info.style.cssText = 'font-size:11px;color:var(--text2);margin-bottom:8px;line-height:1.7;';
+    info.innerHTML = '<b style="color:var(--text);">ID: ' + orphanId + '</b><br>'
+      + slotCount + ' スロット分のデータ　サンプル: ' + sampleText;
+    row.appendChild(info);
+
+    const ctrl = document.createElement('div');
+    ctrl.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
+
+    const sel = document.createElement('select');
+    sel.style.cssText = 'flex:1;min-width:180px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:4px 8px;font-size:12px;';
+    const defOpt = document.createElement('option');
+    defOpt.value = '';
+    defOpt.textContent = '— 付け替え先を選択 —';
+    sel.appendChild(defOpt);
+    allChars.forEach(ch => {
+      const opt = document.createElement('option');
+      opt.value = ch.id;
+      opt.textContent = ch.label;
+      sel.appendChild(opt);
+    });
+    ctrl.appendChild(sel);
+
+    const btn = document.createElement('button');
+    btn.className = 'toolbar-btn primary';
+    btn.textContent = '付け替え実行';
+    btn.addEventListener('click', function() {
+      const targetId = sel.value;
+      if (!targetId) { alert('付け替え先を選択してください。'); return; }
+      if (!confirm('ID「' + orphanId + '」のデータを「' + sel.options[sel.selectedIndex].text + '」に付け替えますか？\n元のIDのデータは削除されます。')) return;
+      remapOrphanData(orphanId, targetId);
+      row.style.opacity = '0.4';
+      btn.disabled = true;
+      btn.textContent = '完了';
+    });
+    ctrl.appendChild(btn);
+    row.appendChild(ctrl);
+    container.appendChild(row);
+  });
+}
+
+function remapOrphanData(fromId, toId) {
+  const srcSlots = timelineData[fromId] || {};
+  if (!timelineData[toId]) timelineData[toId] = {};
+
+  // コピー（既存データは上書きしない）
+  Object.entries(srcSlots).forEach(([slotKey, data]) => {
+    if (!timelineData[toId][slotKey]) {
+      timelineData[toId][slotKey] = data;
+    }
+  });
+
+  delete timelineData[fromId];
+
+  if (!isOffline && db) {
+    db.ref('timeline/' + toId).set(timelineData[toId]);
+    db.ref('timeline/' + fromId).remove();
+  } else {
+    saveOffline();
+  }
+  renderCells();
+}
 
 function switchTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
