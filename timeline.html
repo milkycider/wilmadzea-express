@@ -1328,9 +1328,16 @@
     }
     .chardata-cards {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      grid-template-columns: repeat(2, 1fr);
       gap: 12px;
+      max-height: 420px;
+      overflow-y: auto;
+      padding-right: 4px;
     }
+    .chardata-cards::-webkit-scrollbar { width: 4px; }
+    .chardata-cards::-webkit-scrollbar-track { background: transparent; }
+    .chardata-cards::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .chardata-cards::-webkit-scrollbar-thumb:hover { background: var(--text3); }
     .chardata-card {
       background: var(--bg2);
       border: 1px solid var(--border);
@@ -3822,9 +3829,7 @@ function zoomAt(cx, cy, delta) {
       getWrap().classList.remove('dragging');
     });
     wrap.addEventListener('dblclick', () => zoomReset());
-    document.getElementById('image-modal').addEventListener('click', e => {
-      if (e.target === document.getElementById('image-modal')) closeModal('image-modal');
-    });
+    // image-modal は上の汎用ハンドラでカバーされるため個別登録不要
   }
   attach();
 })();
@@ -3951,11 +3956,19 @@ function closeModal(id) {
   document.getElementById(id).classList.remove('open');
 }
 
+// モーダルの外側クリックで閉じる処理。
+// ドラッグ（テキスト選択など）でモーダル外に出てしまっても閉じないよう、
+// mousedown の始点がオーバーレイ上だった場合のみ閉じる。
+let _modalMousedownOnOverlay = false;
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('mousedown', e => {
+    _modalMousedownOnOverlay = (e.target === overlay);
+  });
   overlay.addEventListener('click', e => {
-    if (e.target === overlay && overlay.id !== 'setup-modal') {
+    if (e.target === overlay && _modalMousedownOnOverlay && overlay.id !== 'setup-modal') {
       overlay.classList.remove('open');
     }
+    _modalMousedownOnOverlay = false;
   });
 });
 
