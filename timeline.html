@@ -459,6 +459,53 @@
     }
     .timeline-cell.is-explored { border-bottom: 2px solid rgba(39,174,96,0.4); }
 
+    /* ── マルチループエントリー ── */
+    .cell-entry {
+      padding: 2px 4px 2px 4px;
+      cursor: pointer;
+      border-radius: 2px;
+      transition: background 0.1s;
+    }
+    .cell-entry:hover { background: rgba(255,255,255,0.07); }
+    .cell-entry-divider {
+      border-bottom: 1px solid rgba(255,255,255,0.09);
+      margin-bottom: 1px;
+      padding-bottom: 2px;
+    }
+    .cell-entry-top {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      margin-bottom: 1px;
+    }
+    .cell-entry-loop-tag {
+      font-size: 8px;
+      font-weight: 700;
+      color: var(--accent);
+      background: rgba(200,146,42,0.15);
+      border: 1px solid rgba(200,146,42,0.45);
+      border-radius: 2px;
+      padding: 0 3px;
+      line-height: 1.5;
+      flex-shrink: 0;
+    }
+
+    .cell-add-loop-btn {
+      display: none;
+      width: 100%;
+      padding: 1px 4px;
+      background: none;
+      border: none;
+      border-top: 1px dashed rgba(200,146,42,0.22);
+      color: var(--accent);
+      font-size: 9px;
+      cursor: pointer;
+      text-align: center;
+      opacity: 0.7;
+    }
+    .timeline-cell:hover .cell-add-loop-btn { display: block; }
+    .cell-add-loop-btn:hover { background: rgba(200,146,42,0.12); opacity: 1; }
+
     /* セル内状態（背景色のみ — ラインは探索済みと区別するため使わない） */
     .timeline-cell.cell-st-alive       { background: rgba(39,174,96,0.18)  !important; }
     .timeline-cell.cell-st-dead        { background: rgba(180,83,75,0.22)  !important; }
@@ -2268,6 +2315,7 @@ function initFirebase(cfg) {
     db.ref('timeline').on('value', snap => {
       timelineData = normalizeTimeline(snap.val());
       migrateExplorers();
+      migrateTimelineToMultiLoop();
       renderCells();
       setSyncStatus('ok', '同期済');
     });
@@ -2325,6 +2373,7 @@ function initOffline() {
       const parsed = JSON.parse(saved);
       timelineData = normalizeTimeline(parsed.timeline || {});
       migrateExplorers();
+      migrateTimelineToMultiLoop();
       resources = parsed.resources || {};
       locationList = parsed.locationList || [];
       notes = parsed.notes || {};
@@ -2596,16 +2645,77 @@ function renderTimelineBody() {
   });
 }
 
+// ═══════════════════════════════════════════════════
+// MULTI-LOOP SLOT HELPERS
+// ═══════════════════════════════════════════════════
+
+// Detect old flat slot format {location, action, ...} vs new bundle format {_:{...}, 1:{...}}
+function isOldSlotFormat(data) {
+  if (!data || typeof data !== 'object') return false;
+  return 'location' in data || 'action' in data || 'notes' in data ||
+         'status' in data || 'explored' in data || 'updatedAt' in data ||
+         'loop' in data || 'timeDetail' in data || 'info' in data;
+}
+
+function hasEntryContent(data) {
+  return !!(data && (data.location || data.action || data.info || data.notes ||
+            data.timeDetail || data.status || data.explored));
+}
+
+// Convert old flat slot data to new bundle format
+function normalizeSlotBundle(data) {
+  if (!data || typeof data !== 'object') return {};
+  if (isOldSlotFormat(data)) {
+    const loopKey = data.loop ? String(data.loop) : '_';
+    const entry = {};
+    ['location','action','info','notes','status','explored','timeDetail','tags','updatedAt'].forEach(k => {
+      if (data[k] !== undefined) entry[k] = data[k];
+    });
+    return { [loopKey]: entry };
+  }
+  return data; // already bundle format
+}
+
+// One-time migration: convert all flat slots in timelineData to bundle format
+function migrateTimelineToMultiLoop() {
+  let changed = false;
+  Object.keys(timelineData).forEach(charId => {
+    const slots = timelineData[charId];
+    if (!slots || typeof slots !== 'object') return;
+    Object.keys(slots).forEach(slotKey => {
+      const data = slots[slotKey];
+      if (isOldSlotFormat(data)) {
+        timelineData[charId][slotKey] = normalizeSlotBundle(data);
+        changed = true;
+      }
+    });
+  });
+  if (changed) {
+    if (!isOffline && db) {
+      db.ref('timeline').set(timelineData);
+    } else {
+      saveOffline();
+    }
+  }
+}
+
 function renderLoopFilter() {
   const bar = document.getElementById('loop-filter-bar');
   if (!bar) return;
 
-  // Gather all loop values from timelineData
+  // Gather all loop values from timelineData (new bundle format)
   const loopVals = new Set();
   Object.values(timelineData).forEach(slots => {
     if (!slots || typeof slots !== 'object') return;
-    Object.values(slots).forEach(d => {
-      if (d && d.loop) loopVals.add(String(d.loop));
+    Object.values(slots).forEach(bundle => {
+      if (!bundle || typeof bundle !== 'object') return;
+      if (isOldSlotFormat(bundle)) {
+        if (bundle.loop) loopVals.add(String(bundle.loop));
+        return;
+      }
+      Object.keys(bundle).forEach(lk => {
+        if (lk !== '_' && hasEntryContent(bundle[lk])) loopVals.add(lk);
+      });
     });
   });
 
@@ -2659,23 +2769,42 @@ function renderCells() {
   renderLoopFilter();
 }
 
-function updateCellDisplay(el, data) {
+function updateCellDisplay(el, bundle) {
   const td = el.closest('.timeline-cell');
   const ST_CLASSES = ['cell-st-alive','cell-st-dead','cell-st-missing','cell-st-unconscious','cell-st-suspicious'];
-  if (!data || (!data.location && !data.action && !data.info && !data.notes && !data.timeDetail && !data.status && !data.explored && !data.loop)) {
+
+  // Normalize old flat format on-the-fly
+  if (bundle && isOldSlotFormat(bundle)) bundle = normalizeSlotBundle(bundle);
+
+  if (!bundle || typeof bundle !== 'object' || Object.keys(bundle).length === 0) {
     el.innerHTML = '';
-    if (td) { td.classList.remove('has-data'); td.classList.remove(...ST_CLASSES); }
+    if (td) { td.classList.remove('has-data', 'is-explored', 'cell-loop-hidden', ...ST_CLASSES); }
     return;
   }
 
-  // Loop layer filter: cells whose loop doesn't match active filter → clear content, dim cell
-  // (cells with no loop set always show normally)
-  const loopFiltered = activeLoopFilter !== null && data.loop && String(data.loop) !== String(activeLoopFilter);
-  if (loopFiltered) {
+  const allEntries = Object.entries(bundle);
+
+  // Filter which entries to show based on active loop filter
+  // '_' (no loop) always shows; other loop keys only show when filter matches
+  const visibleEntries = allEntries.filter(([lk, data]) => {
+    if (!hasEntryContent(data)) return false;
+    if (activeLoopFilter === null) return true;
+    if (lk === '_') return true;
+    return String(lk) === String(activeLoopFilter);
+  });
+
+  // Check if there are entries hidden by the current filter (to show dim indicator)
+  const hasHiddenEntries = activeLoopFilter !== null && allEntries.some(([lk, data]) => {
+    if (!hasEntryContent(data)) return false;
+    return lk !== '_' && String(lk) !== String(activeLoopFilter);
+  });
+
+  if (visibleEntries.length === 0) {
     el.innerHTML = '';
     if (td) {
-      td.classList.remove('has-data', ...ST_CLASSES, 'is-explored');
-      td.classList.add('cell-loop-hidden');
+      td.classList.remove('has-data', 'is-explored', ...ST_CLASSES);
+      if (hasHiddenEntries) td.classList.add('cell-loop-hidden');
+      else td.classList.remove('cell-loop-hidden');
     }
     return;
   }
@@ -2683,18 +2812,37 @@ function updateCellDisplay(el, data) {
   if (td) {
     td.classList.remove('cell-loop-hidden');
     td.classList.add('has-data');
-    td.classList.remove(...ST_CLASSES);
-    if (data.status) td.classList.add('cell-st-' + data.status);
-    if (data.explored) td.classList.add('is-explored');
-    else td.classList.remove('is-explored');
+    td.classList.remove(...ST_CLASSES, 'is-explored');
+    const firstData = visibleEntries[0][1];
+    if (firstData && firstData.status) td.classList.add('cell-st-' + firstData.status);
+    if (firstData && firstData.explored) td.classList.add('is-explored');
   }
+
+  const multi = visibleEntries.length > 1;
+  const charId    = td ? td.dataset.charId    : '';
+  const slotKey   = td ? td.dataset.slotKey   : '';
+  const charName  = td ? td.dataset.charName  : '';
+  const charColor = td ? td.dataset.charColor : '#888';
+  const slotLabel = td ? td.dataset.slotLabel : '';
+  const slotDay   = td ? td.dataset.slotDay   : '0';
+  const isEvent   = td ? td.dataset.isEvent === '1' : false;
+
+  function safeQ(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+
   let html = '';
-  let badges = '';
-  if (data.loop)     badges += '<span class="cell-badge-loop">L' + escHtml(data.loop) + '</span>';
-  if (data.timeDetail) html += `<span class="cell-time-detail">${escHtml(data.timeDetail)}</span>`;
-  if (data.location)   html += `<div class="cell-location">📍 ${escHtml(data.location)}</div>`;
-  if (data.action)     html += `<div class="cell-action">${escHtml(data.action)}</div>`;
-  if (badges) html += '<div class="cell-badges">' + badges + '</div>';
+  visibleEntries.forEach(([lk, data], idx) => {
+    const notLast = idx < visibleEntries.length - 1;
+    html += `<div class="cell-entry${multi && notLast ? ' cell-entry-divider' : ''}" onclick="event.stopPropagation();openCellModal('${safeQ(charId)}','${safeQ(charName)}','${safeQ(charColor)}','${safeQ(slotKey)}','${safeQ(slotLabel)}',${slotDay},${isEvent},'${safeQ(lk)}')">`;
+    let topLine = '';
+    if (lk !== '_') topLine += `<span class="cell-entry-loop-tag">L${escHtml(lk)}</span>`;
+    if (data.timeDetail) topLine += `<span class="cell-time-detail">${escHtml(data.timeDetail)}</span>`;
+    if (topLine) html += `<div class="cell-entry-top">${topLine}</div>`;
+    if (data.location) html += `<div class="cell-location">📍 ${escHtml(data.location)}</div>`;
+    if (data.action)   html += `<div class="cell-action">${escHtml(data.action)}</div>`;
+    html += '</div>';
+  });
+  // ＋ループ追加ボタン（ホバー時のみ表示）
+  html += `<button class="cell-add-loop-btn" onclick="event.stopPropagation();openNewLoopEntry('${safeQ(charId)}','${safeQ(charName)}','${safeQ(charColor)}','${safeQ(slotKey)}','${safeQ(slotLabel)}',${slotDay},${isEvent})">＋ ループ追加</button>`;
   el.innerHTML = html;
 }
 
@@ -2756,9 +2904,34 @@ function moveChar(roomId, charIdx, direction) {
 // CELL MODAL
 // ═══════════════════════════════════════════════════
 
-function openCellModal(charId, charName, charColor, slotKey, slotLabel, slotDay, isEvent) {
-  editingCell = { charId, charName, charColor, slotKey, slotLabel, slotDay, isEvent };
-  const data = (timelineData[charId] || {})[slotKey] || {};
+// 既存エントリーに新しいループエントリーを追加する（上書きしない）
+function openNewLoopEntry(charId, charName, charColor, slotKey, slotLabel, slotDay, isEvent) {
+  openCellModal(charId, charName, charColor, slotKey, slotLabel, slotDay, isEvent, '__fresh__');
+}
+
+function openCellModal(charId, charName, charColor, slotKey, slotLabel, slotDay, isEvent, loopKey) {
+  // Determine which loop entry to open:
+  //   '__fresh__' → new empty entry (don't load existing data, suggest next loop number)
+  //   loopKey given by sub-card click → use it
+  //   loopKey null/undefined + filter active → use filter value
+  //   loopKey null/undefined + 全部 → default to '_' (no-loop entry)
+  let resolvedLoopKey = loopKey != null ? loopKey
+    : (activeLoopFilter !== null ? activeLoopFilter : '_');
+
+  editingCell = { charId, charName, charColor, slotKey, slotLabel, slotDay, isEvent, loopKey: resolvedLoopKey };
+
+  // '__fresh__' = 新規ループエントリー。既存データを読み込まず空欄で開く
+  const rawSlot = (timelineData[charId] || {})[slotKey];
+  const bundle  = normalizeSlotBundle(rawSlot || {});
+  let data = {};
+  let suggestedLoop = '';
+  if (resolvedLoopKey === '__fresh__') {
+    // 既存のループ番号の最大値+1を提案
+    const existingNums = Object.keys(bundle).filter(k => k !== '_').map(Number).filter(n => !isNaN(n));
+    suggestedLoop = existingNums.length > 0 ? String(Math.max(...existingNums) + 1) : '';
+  } else {
+    data = bundle[resolvedLoopKey] || {};
+  }
 
   document.getElementById('cell-modal-title').innerHTML =
     isEvent
@@ -2774,7 +2947,9 @@ function openCellModal(charId, charName, charColor, slotKey, slotLabel, slotDay,
   document.getElementById('cell-notes').value       = data.notes      || '';
   document.getElementById('cell-status').value      = data.status     || '';
   document.getElementById('cell-explored').checked  = !!data.explored;
-  document.getElementById('cell-loop').value        = data.loop || '';
+  // '_' or '__fresh__' → empty string in UI (fresh entry shows suggested next loop)
+  document.getElementById('cell-loop').value        =
+    (resolvedLoopKey === '_' || resolvedLoopKey === '__fresh__') ? suggestedLoop : resolvedLoopKey;
 
   // Hide status row for event rows
   document.getElementById('cell-status-row').style.display = isEvent ? 'none' : '';
@@ -2808,7 +2983,12 @@ function renderTagList() {
 
 function saveCell() {
   if (!editingCell) return;
-  const { charId, slotKey } = editingCell;
+  const { charId, slotKey, loopKey: oldLoopKey } = editingCell;
+
+  // Determine new loop key from UI ('_' means no loop)
+  const loopVal   = document.getElementById('cell-loop').value.trim();
+  const newLoopKey = loopVal ? String(loopVal) : '_';
+
   const data = {
     location:   document.getElementById('cell-location').value.trim(),
     timeDetail: document.getElementById('cell-time-detail').value.trim(),
@@ -2817,53 +2997,91 @@ function saveCell() {
     notes:      document.getElementById('cell-notes').value.trim(),
     status:     editingCell.isEvent ? '' : document.getElementById('cell-status').value,
     explored:   document.getElementById('cell-explored').checked,
-    loop:       document.getElementById('cell-loop').value || '',
     tags:       [...activeTags],
     updatedAt:  Date.now(),
   };
 
-  if (!data.location && !data.timeDetail && !data.action && !data.info && !data.notes && !data.status && !data.explored && !data.loop) {
-    clearCellData(charId, slotKey);
-    closeModal('cell-modal');
-    return;
-  }
+  const isEmpty = !data.location && !data.timeDetail && !data.action && !data.info &&
+                  !data.notes && !data.status && !data.explored;
 
+  // Ensure bundle exists (migrate old flat data if needed)
   if (!timelineData[charId]) timelineData[charId] = {};
-  timelineData[charId][slotKey] = data;
-
-  if (!isOffline && db) {
-    setSyncStatus('syncing', '保存中…');
-    db.ref(`timeline/${charId}/${slotKey}`).set(data)
-      .then(() => setSyncStatus('ok', '同期済'))
-      .catch(() => setSyncStatus('error', '保存失敗'));
-  } else {
-    saveOffline();
+  const rawSlot = timelineData[charId][slotKey];
+  if (!rawSlot || isOldSlotFormat(rawSlot)) {
+    timelineData[charId][slotKey] = normalizeSlotBundle(rawSlot || {});
   }
+  const bundle = timelineData[charId][slotKey];
+
+  // Remove old entry if loop key changed (__fresh__ means new entry, nothing to delete)
+  if (oldLoopKey && oldLoopKey !== '__fresh__' && oldLoopKey !== newLoopKey && oldLoopKey in bundle) {
+    delete bundle[oldLoopKey];
+    if (!isOffline && db) db.ref(`timeline/${charId}/${slotKey}/${oldLoopKey}`).remove();
+  }
+
+  if (isEmpty) {
+    delete bundle[newLoopKey];
+    if (!isOffline && db) db.ref(`timeline/${charId}/${slotKey}/${newLoopKey}`).remove();
+  } else {
+    bundle[newLoopKey] = data;
+    if (!isOffline && db) {
+      setSyncStatus('syncing', '保存中…');
+      db.ref(`timeline/${charId}/${slotKey}/${newLoopKey}`).set(data)
+        .then(() => setSyncStatus('ok', '同期済'))
+        .catch(() => setSyncStatus('error', '保存失敗'));
+    }
+  }
+
+  // Clean up empty bundle
+  if (Object.keys(bundle).length === 0) {
+    delete timelineData[charId][slotKey];
+    if (timelineData[charId] && Object.keys(timelineData[charId]).length === 0) {
+      delete timelineData[charId];
+    }
+    if (!isOffline && db) db.ref(`timeline/${charId}/${slotKey}`).remove();
+  }
+
+  if (isOffline) saveOffline();
 
   const el = document.getElementById(`cell-${charId}-${slotKey}`);
-  if (el) updateCellDisplay(el, data);
+  if (el) updateCellDisplay(el, (timelineData[charId] || {})[slotKey] || null);
 
   closeModal('cell-modal');
 }
 
 function clearCell() {
   if (!editingCell) return;
-  clearCellData(editingCell.charId, editingCell.slotKey);
+  clearCellData(editingCell.charId, editingCell.slotKey, editingCell.loopKey);
   closeModal('cell-modal');
 }
 
-function clearCellData(charId, slotKey) {
-  if (timelineData[charId]) {
+function clearCellData(charId, slotKey, loopKey) {
+  if (!timelineData[charId] || !timelineData[charId][slotKey]) return;
+
+  if (loopKey) {
+    // Clear just the one loop entry
+    const bundle = timelineData[charId][slotKey];
+    if (isOldSlotFormat(bundle)) {
+      timelineData[charId][slotKey] = normalizeSlotBundle(bundle);
+    }
+    delete timelineData[charId][slotKey][loopKey];
+    if (!isOffline && db) db.ref(`timeline/${charId}/${slotKey}/${loopKey}`).remove();
+    // Clean up empty bundle
+    if (Object.keys(timelineData[charId][slotKey]).length === 0) {
+      delete timelineData[charId][slotKey];
+      if (Object.keys(timelineData[charId]).length === 0) delete timelineData[charId];
+      if (!isOffline && db) db.ref(`timeline/${charId}/${slotKey}`).remove();
+    }
+  } else {
+    // Clear all entries for this slot
     delete timelineData[charId][slotKey];
     if (Object.keys(timelineData[charId]).length === 0) delete timelineData[charId];
+    if (!isOffline && db) db.ref(`timeline/${charId}/${slotKey}`).remove();
   }
-  if (!isOffline && db) {
-    db.ref(`timeline/${charId}/${slotKey}`).remove();
-  } else {
-    saveOffline();
-  }
+
+  if (isOffline) saveOffline();
+
   const el = document.getElementById(`cell-${charId}-${slotKey}`);
-  if (el) updateCellDisplay(el, null);
+  if (el) updateCellDisplay(el, (timelineData[charId] || {})[slotKey] || null);
 }
 
 // ═══════════════════════════════════════════════════
@@ -3542,20 +3760,25 @@ function renderLocTimeline() {
     if (!slots || typeof slots !== 'object') return;
     const chInfo = allChars[charId];
     if (!chInfo) return;
-    Object.entries(slots).forEach(([slotKey, data]) => {
-      if (!data) return;
-      const loc = (data.location || '').trim();
-      if (loc) {
-        if (!locIndex[loc]) locIndex[loc] = {};
-        if (!locIndex[loc][slotKey]) locIndex[loc][slotKey] = [];
-        locIndex[loc][slotKey].push({ charId, ...chInfo });
-      } else {
-        // 場所未記入はまとめる
-        const key = '（場所なし）';
+    Object.entries(slots).forEach(([slotKey, bundle]) => {
+      if (!bundle) return;
+      // Handle both old flat format and new bundle format
+      const entries = isOldSlotFormat(bundle)
+        ? [[bundle.loop || '_', bundle]]
+        : Object.entries(bundle);
+      const addedForSlot = new Set(); // deduplicate same loc for same char/slot
+      entries.forEach(([lk, data]) => {
+        if (!data || !hasEntryContent(data)) return;
+        // Respect active loop filter
+        if (activeLoopFilter !== null && lk !== '_' && String(lk) !== String(activeLoopFilter)) return;
+        const loc = (data.location || '').trim();
+        const key = loc || '（場所なし）';
+        if (addedForSlot.has(key)) return;
+        addedForSlot.add(key);
         if (!locIndex[key]) locIndex[key] = {};
         if (!locIndex[key][slotKey]) locIndex[key][slotKey] = [];
         locIndex[key][slotKey].push({ charId, ...chInfo });
-      }
+      });
     });
   });
 
@@ -4370,6 +4593,7 @@ function importData(event) {
       }
       if (data.timeline) {
         timelineData = normalizeTimeline(data.timeline);
+        migrateTimelineToMultiLoop();
         if (!isOffline && db) db.ref('timeline').set(timelineData);
       }
       if (data.locationList) {
