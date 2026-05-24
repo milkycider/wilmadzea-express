@@ -1206,7 +1206,7 @@
 
     /* ── Item Data Tab ── */
     #items-panel {
-      display: flex; flex-direction: column; height: 100%; overflow: hidden;
+      display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;
     }
     #items-toolbar {
       display: flex; align-items: center; gap: 10px;
@@ -1218,7 +1218,7 @@
       border-radius:6px; color:var(--text); padding:5px 10px; font-size:12px;
     }
     #items-body {
-      flex:1; overflow-y:auto; overflow-x:hidden; padding:16px;
+      flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:16px;
       display:grid; grid-template-columns:repeat(auto-fill, minmax(min(300px,100%),1fr)); gap:12px;
       align-content: start;
     }
