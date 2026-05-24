@@ -1328,7 +1328,7 @@
     }
     .chardata-cards {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
       gap: 12px;
       max-height: 420px;
       overflow-y: auto;
@@ -4371,7 +4371,18 @@ function saveLocNote() {
 let locChipTarget = null; // { charId, slotKey }
 
 function openLocChipModal(charId, charName, charColor, slotKey, slotLabel, slotDay) {
-  const data = (timelineData[charId] || {})[slotKey] || {};
+  // バンドル形式対応：アクティブなループフィルター → '_' → 最初の有効エントリーの優先順で取得
+  const rawSlot = (timelineData[charId] || {})[slotKey] || {};
+  const bundle = normalizeSlotBundle(rawSlot);
+  let data = {};
+  if (activeLoopFilter !== null && bundle[activeLoopFilter] && hasEntryContent(bundle[activeLoopFilter])) {
+    data = bundle[activeLoopFilter];
+  } else if (bundle['_'] && hasEntryContent(bundle['_'])) {
+    data = bundle['_'];
+  } else {
+    const firstKey = Object.keys(bundle).find(k => hasEntryContent(bundle[k]));
+    if (firstKey) data = bundle[firstKey];
+  }
   locChipTarget = { charId, slotKey };
 
   const dayLabel = slotDay === 0 ? '出発日' : `D${slotDay}（翌日）`;
