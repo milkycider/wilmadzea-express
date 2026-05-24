@@ -2086,6 +2086,42 @@ function normalizeRooms(val) {
   });
 }
 
+// 旧探索者キャラ → 'explorers' への一回限りの移行
+const OLD_EXPLORER_IDS = ['cranky', 'liam', 'mason', 'mildred'];
+let explorersMigrated = false;
+
+function migrateExplorers() {
+  if (explorersMigrated) return;
+  // すでに explorers にデータがあれば移行不要
+  const hasExplorers = timelineData['explorers'] && Object.keys(timelineData['explorers']).length > 0;
+  const hasOld = OLD_EXPLORER_IDS.some(id => timelineData[id] && Object.keys(timelineData[id]).length > 0);
+  if (!hasOld) { explorersMigrated = true; return; }
+  if (hasExplorers) { explorersMigrated = true; return; }
+
+  // 旧4キャラのデータをスロットごとにマージ（先にデータがある方を優先）
+  const merged = {};
+  OLD_EXPLORER_IDS.forEach(id => {
+    const slots = timelineData[id] || {};
+    Object.entries(slots).forEach(([slotKey, data]) => {
+      if (!merged[slotKey]) merged[slotKey] = data;
+    });
+  });
+
+  if (Object.keys(merged).length > 0) {
+    timelineData['explorers'] = merged;
+    // Firebaseに書き込み、旧データを削除
+    if (!isOffline && db) {
+      db.ref('timeline/explorers').set(merged);
+      OLD_EXPLORER_IDS.forEach(id => {
+        if (timelineData[id]) db.ref('timeline/' + id).remove();
+      });
+    }
+    OLD_EXPLORER_IDS.forEach(id => delete timelineData[id]);
+    console.log('[migrateExplorers] 移行完了:', Object.keys(merged).length, 'スロット');
+  }
+  explorersMigrated = true;
+}
+
 // Migrate old flat timeline format (charId_slotKey) to new nested format (charId/slotKey)
 function normalizeTimeline(val) {
   if (!val) return {};
@@ -2178,6 +2214,7 @@ function initFirebase(cfg) {
     // Listen for timeline data (nested format)
     db.ref('timeline').on('value', snap => {
       timelineData = normalizeTimeline(snap.val());
+      migrateExplorers();
       renderCells();
       setSyncStatus('ok', '同期済');
     });
@@ -2234,6 +2271,7 @@ function initOffline() {
     try {
       const parsed = JSON.parse(saved);
       timelineData = normalizeTimeline(parsed.timeline || {});
+      migrateExplorers();
       resources = parsed.resources || {};
       locationList = parsed.locationList || [];
       notes = parsed.notes || {};
