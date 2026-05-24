@@ -490,22 +490,6 @@
       flex-shrink: 0;
     }
 
-    .cell-add-loop-btn {
-      display: none;
-      width: 100%;
-      padding: 1px 4px;
-      background: none;
-      border: none;
-      border-top: 1px dashed rgba(200,146,42,0.22);
-      color: var(--accent);
-      font-size: 9px;
-      cursor: pointer;
-      text-align: center;
-      opacity: 0.7;
-    }
-    .timeline-cell:hover .cell-add-loop-btn { display: block; }
-    .cell-add-loop-btn:hover { background: rgba(200,146,42,0.12); opacity: 1; }
-
     /* セル内状態（背景色のみ — ラインは探索済みと区別するため使わない） */
     .timeline-cell.cell-st-alive       { background: rgba(39,174,96,0.18)  !important; }
     .timeline-cell.cell-st-dead        { background: rgba(180,83,75,0.22)  !important; }
@@ -1741,6 +1725,7 @@
     </div>
     <div class="modal-footer">
       <button class="toolbar-btn" style="color:var(--red);border-color:var(--red);" onclick="clearCell()">クリア</button>
+      <button class="toolbar-btn" id="cell-add-loop-modal-btn" onclick="addLoopEntry()" style="color:var(--accent);border-color:rgba(200,146,42,0.5);" title="このスロットに別ループのエントリーを追加">＋ 別ループ</button>
       <button class="toolbar-btn" onclick="closeModal('cell-modal')">キャンセル</button>
       <button class="toolbar-btn primary" onclick="saveCell()">保存</button>
     </div>
@@ -2841,8 +2826,6 @@ function updateCellDisplay(el, bundle) {
     if (data.action)   html += `<div class="cell-action">${escHtml(data.action)}</div>`;
     html += '</div>';
   });
-  // ＋ループ追加ボタン（ホバー時のみ表示）
-  html += `<button class="cell-add-loop-btn" onclick="event.stopPropagation();openNewLoopEntry('${safeQ(charId)}','${safeQ(charName)}','${safeQ(charColor)}','${safeQ(slotKey)}','${safeQ(slotLabel)}',${slotDay},${isEvent})">＋ ループ追加</button>`;
   el.innerHTML = html;
 }
 
@@ -2909,6 +2892,15 @@ function openNewLoopEntry(charId, charName, charColor, slotKey, slotLabel, slotD
   openCellModal(charId, charName, charColor, slotKey, slotLabel, slotDay, isEvent, '__fresh__');
 }
 
+// モーダル内「＋ 別ループ」ボタン用：現在のスロットに新規ループエントリーを追加
+function addLoopEntry() {
+  if (!editingCell) return;
+  const { charId, charName, charColor, slotKey, slotLabel, slotDay, isEvent } = editingCell;
+  closeModal('cell-modal');
+  // モーダルが閉じてから開く
+  requestAnimationFrame(() => openNewLoopEntry(charId, charName, charColor, slotKey, slotLabel, slotDay, isEvent));
+}
+
 function openCellModal(charId, charName, charColor, slotKey, slotLabel, slotDay, isEvent, loopKey) {
   // Determine which loop entry to open:
   //   '__fresh__' → new empty entry (don't load existing data, suggest next loop number)
@@ -2953,6 +2945,9 @@ function openCellModal(charId, charName, charColor, slotKey, slotLabel, slotDay,
 
   // Hide status row for event rows
   document.getElementById('cell-status-row').style.display = isEvent ? 'none' : '';
+  // 新規エントリーモード（__fresh__）のときは「＋ 別ループ」ボタン非表示
+  const addBtn = document.getElementById('cell-add-loop-modal-btn');
+  if (addBtn) addBtn.style.display = resolvedLoopKey === '__fresh__' ? 'none' : '';
 
   activeTags = new Set(data.tags || []);
   renderTagList();
