@@ -4335,7 +4335,14 @@ function renderLocTimeline() {
           tag.className = 'loc-pos-tag';
           const dname = ch.displayName || ch.name;
           const shortName = dname.length > 9 ? dname.slice(0, 8) + '…' : dname;
-          tag.innerHTML = `<span class="loc-pos-tag-dot" style="background:${escHtml(ch.color||'#888')}"></span>${escHtml(shortName)}<span class="loc-pos-tag-remove" title="外す">×</span>`;
+          // このスロットで探索済みかチェック
+          const _bundle = normalizeSlotBundle((timelineData[ch.id] || {})[slot.key] || {});
+          const _explored = Object.entries(_bundle).some(([lk, d]) => {
+            if (!d || !hasEntryContent(d)) return false;
+            if (activeLoopFilter !== null && lk !== '_' && String(lk) !== String(activeLoopFilter)) return false;
+            return !!d.explored;
+          });
+          tag.innerHTML = `<span class="loc-pos-tag-dot" style="background:${escHtml(ch.color||'#888')}"></span>${escHtml(shortName)}${_explored ? '<span class="loc-chip-explored">✔</span>' : ''}<span class="loc-pos-tag-remove" title="外す">×</span>`;
           tag.querySelector('.loc-pos-tag-remove').onclick = (e) => {
             e.stopPropagation();
             removeCharFromPos(ch.id, slot.key);
