@@ -2208,6 +2208,11 @@ function initFirebase(cfg) {
       if (val) {
         rooms = normalizeRooms(val);
         renderTimeline();
+      } else {
+        // roomsがFirebaseにない場合はDEFAULT_ROOMSで初期化して書き込む
+        rooms = JSON.parse(JSON.stringify(DEFAULT_ROOMS));
+        db.ref('rooms').set(rooms);
+        renderTimeline();
       }
     });
 
