@@ -1020,6 +1020,109 @@
     .loc-char-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
     /* カード非表示モード */
     #loctimeline-wrap.hide-chips .loc-char-chip { display: none; }
+
+    /* ── 場所タイムライン表示モードボタン ── */
+    .loc-mode-btn {
+      padding: 3px 10px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .loc-mode-btn:hover { background: var(--bg4); color: var(--text); }
+    .loc-mode-btn.active { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.6); color: #a5b4fc; }
+
+    /* ── 位置管理モード ── */
+    .loc-pos-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 10px;
+      margin: 1px 2px 1px 0;
+      background: var(--bg4);
+      border: 1px solid var(--border);
+      cursor: default;
+      white-space: nowrap;
+    }
+    .loc-pos-tag-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .loc-pos-tag-remove {
+      margin-left: 1px;
+      cursor: pointer;
+      color: var(--text3);
+      font-size: 10px;
+      line-height: 1;
+      padding: 0 1px;
+    }
+    .loc-pos-tag-remove:hover { color: var(--red); }
+    .loc-pos-add {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 5px;
+      background: none;
+      border: 1px dashed var(--border);
+      border-radius: 3px;
+      color: var(--text3);
+      font-size: 10px;
+      cursor: pointer;
+      margin: 1px 0;
+    }
+    .loc-pos-add:hover { border-color: var(--accent2); color: var(--accent); }
+    .loc-unknown-row td { background: rgba(255,255,255,0.015); }
+    .loc-unknown-row .col-name { color: var(--text3); font-style: italic; font-weight: normal; }
+    .loc-unknown-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 10px;
+      margin: 1px 2px 1px 0;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--text3);
+      font-style: italic;
+      white-space: nowrap;
+    }
+
+    /* ── キャラピッカーポップアップ ── */
+    .char-picker-popup {
+      position: fixed;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      padding: 6px;
+      z-index: 9000;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      max-width: 260px;
+    }
+    .char-picker-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 7px;
+      border-radius: 3px;
+      font-size: 11px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      color: var(--text);
+      white-space: nowrap;
+      transition: all 0.1s;
+    }
+    .char-picker-item:hover { background: var(--bg4); }
+    .char-picker-item.placed-here { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.5); color: #a5b4fc; }
+    .char-picker-item.placed-other { opacity: 0.45; }
+    .char-picker-dot { width: 7px; height: 7px; border-radius: 50%; }
     .loc-row-unassigned .loc-name-cell { color: var(--text3); font-style: italic; font-weight: normal; }
 
     /* Location chip modal body */
@@ -1450,9 +1553,11 @@
   <div id="loctimeline-toolbar">
     <span style="font-size:11px;color:var(--text2);">キャラクタータイムラインの「場所」欄を場所ごとに集計した逆引きビューです。チップをクリックすると元のセルにジャンプします。</span>
     <div id="loctimeline-loop-filter-bar" style="display:none;align-items:center;gap:4px;"></div>
-    <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);cursor:pointer;margin-left:auto;">
-      <input type="checkbox" id="loctimeline-hide-chips" onchange="toggleLocHideChips(this)"> カード非表示
-    </label>
+    <div style="display:flex;align-items:center;gap:3px;margin-left:auto;">
+      <button class="loc-mode-btn active" id="loc-mode-btn-normal"   onclick="setLocViewMode('normal')">通常</button>
+      <button class="loc-mode-btn"        id="loc-mode-btn-hidechips" onclick="setLocViewMode('hidechips')">カード非表示</button>
+      <button class="loc-mode-btn"        id="loc-mode-btn-pos"       onclick="setLocViewMode('pos')">位置管理</button>
+    </div>
     <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);cursor:pointer;">
       <input type="checkbox" id="loctimeline-hide-empty" onchange="renderLocTimeline()"> 空行を非表示
     </label>
@@ -2142,7 +2247,9 @@ let notes = {}; // { noteId: { id, title, body, tags, timeRef, charId, createdAt
 let charNotes = {}; // { charId: { memo, updatedAt } }
 let items = {}; // { itemId: { id, name, cat, owner, desc, memo, memoUpdatedAt, createdAt } }
 let editingItemId = null;
-let locationNotes = {}; // { locName: { memo, updatedAt } }
+let locationNotes = {}; // { locName: { slotKey: { memo, updatedAt } } }
+let positionData  = {}; // { slotKey: { charId: locName } } — 位置管理モード用
+let locViewMode   = 'normal'; // 'normal' | 'hidechips' | 'pos'
 let editingLocName = null;
 let editingLocSlot = null;
 let activeLoopFilter = null; // null=全部, string='1'/'2'/etc.
@@ -2350,6 +2457,11 @@ function initFirebase(cfg) {
       if (document.getElementById('tab-loctimeline').classList.contains('active')) renderLocTimeline();
     });
 
+    db.ref('positionData').on('value', snap => {
+      positionData = snap.val() || {};
+      if (locViewMode === 'pos' && document.getElementById('tab-loctimeline').classList.contains('active')) renderLocTimeline();
+    });
+
     isOffline = false;
     return true;
   } catch (e) {
@@ -2378,6 +2490,7 @@ function initOffline() {
       charNotes = parsed.charNotes || {};
       items = parsed.items || {};
       locationNotes = parsed.locationNotes || {};
+      positionData  = parsed.positionData  || {};
       if (parsed.rooms) rooms = normalizeRooms(parsed.rooms);
     } catch(e) {}
   }
@@ -2397,6 +2510,7 @@ function saveOffline() {
     rooms,
     locationList,
     notes,
+    positionData,
   }));
 }
 
@@ -3756,17 +3870,123 @@ document.addEventListener('keydown', e => {
 // LOCATION TIMELINE
 // ═══════════════════════════════════════════════════
 
+// ── 表示モード切り替え ──
+function setLocViewMode(mode) {
+  locViewMode = mode;
+  ['normal','hidechips','pos'].forEach(m => {
+    const btn = document.getElementById('loc-mode-btn-' + m);
+    if (btn) btn.classList.toggle('active', m === mode);
+  });
+  // カード非表示はCSSクラスで制御
+  const wrap = document.getElementById('loctimeline-wrap');
+  if (wrap) {
+    wrap.classList.toggle('hide-chips', mode === 'hidechips');
+  }
+  renderLocTimeline();
+}
+
 function toggleLocHideChips(cb) {
   const wrap = document.getElementById('loctimeline-wrap');
   if (wrap) wrap.classList.toggle('hide-chips', cb.checked);
 }
 
+// ── 位置管理：キャラクターを場所にアサイン ──
+function assignCharToLoc(charId, locName, slotKey) {
+  if (!positionData[slotKey]) positionData[slotKey] = {};
+  positionData[slotKey][charId] = locName;
+  savePositionSlot(slotKey);
+  renderLocTimeline();
+}
+
+function removeCharFromPos(charId, slotKey) {
+  if (positionData[slotKey]) {
+    delete positionData[slotKey][charId];
+    if (Object.keys(positionData[slotKey]).length === 0) delete positionData[slotKey];
+  }
+  savePositionSlot(slotKey);
+  renderLocTimeline();
+}
+
+function savePositionSlot(slotKey) {
+  if (!isOffline && db) {
+    const slot = positionData[slotKey];
+    if (slot && Object.keys(slot).length > 0) {
+      db.ref('positionData/' + slotKey).set(slot);
+    } else {
+      db.ref('positionData/' + slotKey).remove();
+    }
+  } else {
+    saveOffline();
+  }
+}
+
+// ── キャラピッカーポップアップ ──
+let pickerTarget = null; // { locName, slotKey }
+let pickerEl = null;
+
+function openCharPicker(locName, slotKey, anchorEl) {
+  closeCharPicker();
+  pickerTarget = { locName, slotKey };
+
+  // 全キャラ一覧（roomsの順で）
+  const allChars = [];
+  rooms.forEach(room => room.chars.forEach(ch => {
+    if (!ch.isEvent) allChars.push(ch);
+  }));
+
+  const slotPos = positionData[slotKey] || {};
+
+  const popup = document.createElement('div');
+  popup.className = 'char-picker-popup';
+  popup.id = 'char-picker-popup';
+
+  allChars.forEach(ch => {
+    const placedAt = slotPos[ch.id];
+    const isHere  = placedAt === locName;
+    const isOther = placedAt && placedAt !== locName;
+
+    const item = document.createElement('div');
+    item.className = 'char-picker-item' + (isHere ? ' placed-here' : isOther ? ' placed-other' : '');
+    item.innerHTML = `<span class="char-picker-dot" style="background:${escHtml(ch.color||'#888')}"></span>${escHtml(ch.name)}`;
+    if (isOther) item.title = `現在: ${placedAt}`;
+
+    item.onclick = (e) => {
+      e.stopPropagation();
+      if (isHere) {
+        removeCharFromPos(ch.id, slotKey);
+      } else {
+        assignCharToLoc(ch.id, locName, slotKey);
+      }
+      closeCharPicker();
+    };
+    popup.appendChild(item);
+  });
+
+  // ポップアップ位置（アンカーの下）
+  document.body.appendChild(popup);
+  pickerEl = popup;
+  const rect = anchorEl.getBoundingClientRect();
+  let top  = rect.bottom + 4;
+  let left = rect.left;
+  if (left + 270 > window.innerWidth) left = window.innerWidth - 274;
+  if (top  + 150 > window.innerHeight) top = rect.top - popup.offsetHeight - 4;
+  popup.style.top  = top  + 'px';
+  popup.style.left = left + 'px';
+}
+
+function closeCharPicker() {
+  if (pickerEl) { pickerEl.remove(); pickerEl = null; }
+  pickerTarget = null;
+}
+
+document.addEventListener('click', (e) => {
+  if (pickerEl && !pickerEl.contains(e.target)) closeCharPicker();
+});
+
 function renderLocTimeline() {
   const wrap = document.getElementById('loctimeline-wrap');
   if (!wrap) return;
 
-  // カード非表示状態を再描画後も引き継ぐ
-  const hideChips = document.getElementById('loctimeline-hide-chips')?.checked;
   const hideEmpty = document.getElementById('loctimeline-hide-empty').checked;
 
   // キャラID→{name,color} マップを構築
@@ -3846,6 +4066,39 @@ function renderLocTimeline() {
 
   // ─ 本体 ─
   const tbody = document.createElement('tbody');
+
+  // 位置管理モード：「不明の場所」行（未アサインキャラ）を先頭に追加
+  if (locViewMode === 'pos') {
+    const unknownTr = document.createElement('tr');
+    unknownTr.className = 'loc-row loc-unknown-row';
+
+    const unknownTh = document.createElement('td');
+    unknownTh.className = 'col-name loc-name-cell';
+    unknownTh.innerHTML = '<div class="loc-name-inner"><div class="loc-name-top"><span class="loc-name-text">❓ 不明の場所</span></div></div>';
+    unknownTr.appendChild(unknownTh);
+
+    // 全キャラIDを収集
+    const allCharList = [];
+    rooms.forEach(room => room.chars.forEach(ch => { if (!ch.isEvent) allCharList.push(ch); }));
+
+    TIME_SLOTS.forEach(slot => {
+      const td = document.createElement('td');
+      td.className = 'loc-cell' + (slot.hour === 0 && slot.day > 0 ? ' day-change' : '');
+      const slotPos = positionData[slot.key] || {};
+      allCharList.forEach(ch => {
+        if (!slotPos[ch.id]) {
+          const tag = document.createElement('span');
+          tag.className = 'loc-unknown-tag';
+          const shortName = ch.name.length > 9 ? ch.name.slice(0, 8) + '…' : ch.name;
+          tag.innerHTML = `<span class="loc-pos-tag-dot" style="background:${escHtml(ch.color||'#888')}"></span>${escHtml(shortName)}`;
+          td.appendChild(tag);
+        }
+      });
+      unknownTr.appendChild(td);
+    });
+    tbody.appendChild(unknownTr);
+  }
+
   locEntries.forEach(([locName, slotMap]) => {
     const isUnassigned = locName === '（場所なし）';
     const tr = document.createElement('tr');
@@ -3872,20 +4125,48 @@ function renderLocTimeline() {
     TIME_SLOTS.forEach(slot => {
       const td = document.createElement('td');
       td.className = 'loc-cell' + (slot.hour === 0 && slot.day > 0 ? ' day-change' : '');
-      const chars = slotMap[slot.key] || [];
-      chars.forEach(ch => {
-        const chip = document.createElement('div');
-        chip.className = 'loc-char-chip';
-        chip.title = ch.name;
-        const shortName = ch.name.length > 9 ? ch.name.slice(0, 8) + '…' : ch.name;
-        chip.innerHTML = `<span class="loc-char-dot" style="background:${escHtml(ch.color)}"></span>${escHtml(shortName)}`;
-        chip.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openLocChipModal(ch.charId, ch.name, ch.color, slot.key, slot.label, slot.day);
+
+      if (locViewMode === 'pos' && !isUnassigned) {
+        // ── 位置管理モード：手動アサインタグを表示 ──
+        const slotPos = positionData[slot.key] || {};
+        Object.entries(slotPos).forEach(([charId, cLocName]) => {
+          if (cLocName !== locName) return;
+          const chInfo = allChars[charId];
+          if (!chInfo) return;
+          const tag = document.createElement('span');
+          tag.className = 'loc-pos-tag';
+          const shortName = chInfo.name.length > 9 ? chInfo.name.slice(0, 8) + '…' : chInfo.name;
+          tag.innerHTML = `<span class="loc-pos-tag-dot" style="background:${escHtml(chInfo.color||'#888')}"></span>${escHtml(shortName)}<span class="loc-pos-tag-remove" title="外す">×</span>`;
+          tag.querySelector('.loc-pos-tag-remove').onclick = (e) => {
+            e.stopPropagation();
+            removeCharFromPos(charId, slot.key);
+          };
+          td.appendChild(tag);
         });
-        td.appendChild(chip);
-      });
-      // セルのノート表示
+        // ＋ 追加ボタン
+        const addBtn = document.createElement('button');
+        addBtn.className = 'loc-pos-add';
+        addBtn.textContent = '＋';
+        addBtn.onclick = (e) => { e.stopPropagation(); openCharPicker(locName, slot.key, addBtn); };
+        td.appendChild(addBtn);
+      } else {
+        // ── 通常 / カード非表示モード：timelineDataから自動表示 ──
+        const chars = slotMap[slot.key] || [];
+        chars.forEach(ch => {
+          const chip = document.createElement('div');
+          chip.className = 'loc-char-chip';
+          chip.title = ch.name;
+          const shortName = ch.name.length > 9 ? ch.name.slice(0, 8) + '…' : ch.name;
+          chip.innerHTML = `<span class="loc-char-dot" style="background:${escHtml(ch.color)}"></span>${escHtml(shortName)}`;
+          chip.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openLocChipModal(ch.charId, ch.name, ch.color, slot.key, slot.label, slot.day);
+          });
+          td.appendChild(chip);
+        });
+      }
+
+      // メモ表示（全モード共通）
       if (!isUnassigned) {
         const locSlotNote = (locationNotes[locName] || {})[slot.key];
         if (locSlotNote && locSlotNote.memo) {
@@ -3895,7 +4176,6 @@ function renderLocTimeline() {
           noteDiv.textContent = locSlotNote.memo;
           td.appendChild(noteDiv);
         }
-        // クリックでノートを編集
         const dayLabel = slot.day === 0 ? '出発日 ' + slot.label : 'D' + slot.day + ' ' + slot.label;
         td.addEventListener('click', function() {
           openLocNoteModal(locName, slot.key, dayLabel);
@@ -3909,9 +4189,8 @@ function renderLocTimeline() {
 
   wrap.innerHTML = '';
   wrap.appendChild(table);
-  // カード非表示状態を再描画後も反映
-  if (hideChips) wrap.classList.add('hide-chips');
-  else wrap.classList.remove('hide-chips');
+  // モードに応じてCSSクラスを反映
+  wrap.classList.toggle('hide-chips', locViewMode === 'hidechips');
 }
 
 // ═══════════════════════════════════════════════════
