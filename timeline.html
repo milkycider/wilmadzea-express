@@ -387,11 +387,11 @@
     .timeline-cell.has-data { background: var(--bg3); }
     .timeline-cell.has-data:hover { background: var(--bg4); }
     /* セル内状態ライン */
-    .timeline-cell.cell-st-alive    { border-top: 3px solid var(--green);  }
-    .timeline-cell.cell-st-dead     { border-top: 3px solid var(--red);    background: rgba(180,83,75,0.10) !important; }
-    .timeline-cell.cell-st-missing  { border-top: 3px solid var(--orange); background: rgba(230,126,34,0.08) !important; }
-    .timeline-cell.cell-st-unconscious { border-top: 3px solid var(--purple); background: rgba(155,89,182,0.08) !important; }
-    .timeline-cell.cell-st-suspicious  { border-top: 3px solid var(--gold);   background: rgba(255,176,9,0.07) !important; }
+    .timeline-cell.cell-st-alive    { border-top: 2px solid rgba(39,174,96,0.5);  }
+    .timeline-cell.cell-st-dead     { border-top: 2px solid rgba(180,83,75,0.6);  background: rgba(180,83,75,0.05) !important; }
+    .timeline-cell.cell-st-missing  { border-top: 2px solid rgba(230,126,34,0.55); background: rgba(230,126,34,0.04) !important; }
+    .timeline-cell.cell-st-unconscious { border-top: 2px solid rgba(155,89,182,0.5); background: rgba(155,89,182,0.04) !important; }
+    .timeline-cell.cell-st-suspicious  { border-top: 2px solid rgba(255,176,9,0.5);  background: rgba(255,176,9,0.03) !important; }
     .cell-content {
       font-size: 10px;
       line-height: 1.4;
@@ -890,7 +890,146 @@
       min-width: 60px;
     }
 
-    /* ── Notes Tab ── */
+    /* ── Char Data Tab ── */
+    #chardata-panel {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+    #chardata-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    #chardata-toolbar h2 {
+      font-size: 14px;
+      color: var(--accent);
+      letter-spacing: .1em;
+      flex-shrink: 0;
+    }
+    #chardata-search {
+      flex: 1;
+      max-width: 280px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 5px 10px;
+      font-size: 12px;
+    }
+    #chardata-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .chardata-room-label {
+      font-size: 11px;
+      color: var(--text3);
+      letter-spacing: .1em;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    .chardata-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 12px;
+    }
+    .chardata-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .chardata-card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px 8px;
+    }
+    .chardata-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .chardata-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      flex: 1;
+      min-width: 0;
+    }
+    .chardata-meta {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+    .chardata-role {
+      font-size: 10px;
+      color: var(--text3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+    .chardata-body {
+      padding: 0 12px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .chardata-note-label {
+      font-size: 10px;
+      color: var(--text3);
+    }
+    .chardata-memo {
+      width: 100%;
+      min-height: 80px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 12px;
+      font-family: inherit;
+      padding: 8px;
+      resize: vertical;
+      line-height: 1.6;
+      transition: border-color 0.15s;
+    }
+    .chardata-memo:focus { outline: none; border-color: var(--accent2); }
+    .chardata-memo-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .chardata-save-btn {
+      font-size: 11px;
+      padding: 3px 12px;
+      background: var(--accent2);
+      border: none;
+      border-radius: 4px;
+      color: var(--bg);
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s;
+      pointer-events: none;
+    }
+    .chardata-save-btn.dirty { opacity: 1; pointer-events: auto; }
+    .chardata-save-btn:hover { filter: brightness(1.15); }
+    .chardata-saved-at { font-size: 10px; color: var(--text3); }
+
+        /* ── Notes Tab ── */
     #notes-panel {
       padding: 20px;
       overflow-y: auto;
@@ -1010,6 +1149,7 @@
 <div id="tab-bar">
   <button class="tab-btn active" data-tab="timeline"    onclick="switchTab('timeline')">📋 キャラクタータイムライン</button>
   <button class="tab-btn"        data-tab="loctimeline" onclick="switchTab('loctimeline')">📍 場所タイムライン</button>
+  <button class="tab-btn"        data-tab="chardata"    onclick="switchTab('chardata')">👤 登場人物データ</button>
   <button class="tab-btn"        data-tab="notes"       onclick="switchTab('notes')">📝 調査メモ</button>
   <button class="tab-btn"        data-tab="resources"   onclick="switchTab('resources')">🗂 資料一覧</button>
   <button class="tab-btn"        data-tab="settings"    onclick="switchTab('settings')">⚙ 設定</button>
@@ -1053,6 +1193,17 @@
     <div class="empty-state" style="margin:40px auto;text-align:center;color:var(--text3);">
       設定タブで場所リストを登録し、キャラクタータイムラインのセルに場所を入力すると表示されます。
     </div>
+  </div>
+</div>
+
+<!-- ═══ TAB: CHARDATA ═══ -->
+<div id="tab-chardata" class="tab-panel">
+  <div id="chardata-panel">
+    <div id="chardata-toolbar">
+      <h2>👤 登場人物データ</h2>
+      <input type="text" id="chardata-search" placeholder="名前・役職・メモで検索…" oninput="renderCharData()">
+    </div>
+    <div id="chardata-body"></div>
   </div>
 </div>
 
@@ -1614,6 +1765,7 @@ let timelineData = {};
 let resources = {};
 let locationList = [];
 let notes = {}; // { noteId: { id, title, body, tags, timeRef, charId, createdAt, updatedAt } }
+let charNotes = {}; // { charId: { memo, updatedAt } }
 let editingCell = null;
 let isOffline = false;
 let activeTags = new Set();
@@ -1750,6 +1902,12 @@ function initFirebase(cfg) {
       if (document.getElementById('tab-notes').classList.contains('active')) renderNotes();
     });
 
+    // Listen for charNotes
+    db.ref('charNotes').on('value', snap => {
+      charNotes = snap.val() || {};
+      if (document.getElementById('tab-chardata').classList.contains('active')) renderCharData();
+    });
+
     isOffline = false;
     return true;
   } catch (e) {
@@ -1773,6 +1931,7 @@ function initOffline() {
       resources = parsed.resources || {};
       locationList = parsed.locationList || [];
       notes = parsed.notes || {};
+      charNotes = parsed.charNotes || {};
       if (parsed.rooms) rooms = normalizeRooms(parsed.rooms);
     } catch(e) {}
   }
@@ -2764,6 +2923,7 @@ function switchTab(name) {
   // 場所タイムライン・調査メモは切り替え時にレンダリング
   if (name === 'loctimeline') renderLocTimeline();
   if (name === 'notes') renderNotes();
+  if (name === 'chardata') renderCharData();
 }
 
 // ═══════════════════════════════════════════════════
@@ -2970,6 +3130,176 @@ function jumpToCharCell() {
 // ═══════════════════════════════════════════════════
 
 let editingNoteId = null;
+
+// ═══════════════════════════════════════════════════
+// CHARDATA TAB
+// ═══════════════════════════════════════════════════
+
+function saveCharMemo(charId, memo, btnEl, savedAtEl) {
+  const data = { memo: memo, updatedAt: Date.now() };
+  charNotes[charId] = data;
+  if (!isOffline && db) {
+    db.ref('charNotes/' + charId).set(data);
+  } else {
+    // offline: persist in sessionStorage
+    const saved = sessionStorage.getItem('wex_timeline');
+    const parsed = saved ? JSON.parse(saved) : {};
+    parsed.charNotes = charNotes;
+    sessionStorage.setItem('wex_timeline', JSON.stringify(parsed));
+  }
+  if (btnEl) btnEl.classList.remove('dirty');
+  if (savedAtEl) {
+    const d = new Date(data.updatedAt);
+    savedAtEl.textContent = '保存済 ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0');
+  }
+}
+
+function renderCharData() {
+  const body = document.getElementById('chardata-body');
+  if (!body) return;
+  const query = (document.getElementById('chardata-search') || {}).value || '';
+  const q = query.trim().toLowerCase();
+
+  body.innerHTML = '';
+
+  // イベント行は除外してキャラクターのみ対象
+  const allRooms = rooms.filter(function(r) { return !r.isEventRoom; });
+
+  allRooms.forEach(function(room) {
+    const matchedChars = room.chars.filter(function(char) {
+      if (char.isEvent) return false;
+      if (!q) return true;
+      const memo = charNotes[char.id] ? (charNotes[char.id].memo || '') : '';
+      return (
+        char.name.toLowerCase().includes(q) ||
+        (char.role || '').toLowerCase().includes(q) ||
+        (char.note || '').toLowerCase().includes(q) ||
+        memo.toLowerCase().includes(q)
+      );
+    });
+    if (matchedChars.length === 0) return;
+
+    const section = document.createElement('div');
+    section.className = 'chardata-room-section';
+
+    const roomLabel = document.createElement('div');
+    roomLabel.className = 'chardata-room-label';
+    roomLabel.textContent = room.name;
+    section.appendChild(roomLabel);
+
+    const cardsGrid = document.createElement('div');
+    cardsGrid.className = 'chardata-cards';
+
+    matchedChars.forEach(function(char) {
+      const cn = charNotes[char.id] || {};
+      const memo = cn.memo || '';
+      const updatedAt = cn.updatedAt || null;
+
+      const card = document.createElement('div');
+      card.className = 'chardata-card';
+      card.style.borderLeftColor = char.color || 'var(--border)';
+
+      // ── header ──
+      const header = document.createElement('div');
+      header.className = 'chardata-card-header';
+
+      const dot = document.createElement('span');
+      dot.className = 'chardata-dot';
+      dot.style.background = char.color || '#888';
+      header.appendChild(dot);
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'chardata-name';
+      nameSpan.textContent = char.name;
+      header.appendChild(nameSpan);
+
+      const metaDiv = document.createElement('div');
+      metaDiv.className = 'chardata-meta';
+
+      if (char.role) {
+        const roleSpan = document.createElement('span');
+        roleSpan.className = 'chardata-role';
+        roleSpan.textContent = char.role;
+        metaDiv.appendChild(roleSpan);
+      }
+      if (char.status && STATUS_LABELS[char.status]) {
+        const stBadge = document.createElement('span');
+        stBadge.className = 'status-badge status-' + char.status;
+        stBadge.textContent = STATUS_LABELS[char.status];
+        metaDiv.appendChild(stBadge);
+      }
+      header.appendChild(metaDiv);
+      card.appendChild(header);
+
+      // ── body ──
+      const cardBody = document.createElement('div');
+      cardBody.className = 'chardata-body';
+
+      // キャラ設定メモ（role / note）
+      if (char.note) {
+        const noteLine = document.createElement('div');
+        noteLine.style.cssText = 'font-size:11px;color:var(--text3);padding:0 0 2px;';
+        noteLine.textContent = char.note;
+        cardBody.appendChild(noteLine);
+      }
+
+      // メモラベル
+      const memoLabel = document.createElement('div');
+      memoLabel.className = 'chardata-note-label';
+      memoLabel.textContent = '調査メモ';
+      cardBody.appendChild(memoLabel);
+
+      // テキストエリア
+      const textarea = document.createElement('textarea');
+      textarea.className = 'chardata-memo';
+      textarea.placeholder = 'このキャラクターについて調べたことを記録…';
+      textarea.value = memo;
+      cardBody.appendChild(textarea);
+
+      // フッター（保存ボタン＋保存日時）
+      const footer = document.createElement('div');
+      footer.className = 'chardata-memo-footer';
+
+      const savedAt = document.createElement('span');
+      savedAt.className = 'chardata-saved-at';
+      if (updatedAt) {
+        const d = new Date(updatedAt);
+        savedAt.textContent = '保存済 ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0');
+      }
+      footer.appendChild(savedAt);
+
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'chardata-save-btn';
+      saveBtn.textContent = '保存';
+      footer.appendChild(saveBtn);
+      cardBody.appendChild(footer);
+
+      // dirty検知
+      textarea.addEventListener('input', function() {
+        saveBtn.classList.add('dirty');
+      });
+      saveBtn.addEventListener('click', function() {
+        saveCharMemo(char.id, textarea.value, saveBtn, savedAt);
+      });
+      // Ctrl+Enter でも保存
+      textarea.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          saveCharMemo(char.id, textarea.value, saveBtn, savedAt);
+        }
+      });
+
+      card.appendChild(cardBody);
+      cardsGrid.appendChild(card);
+    });
+
+    section.appendChild(cardsGrid);
+    body.appendChild(section);
+  });
+
+  if (body.children.length === 0) {
+    body.innerHTML = '<div class="empty-state">該当するキャラクターが見つかりません。</div>';
+  }
+}
 
 function renderNotes() {
   const grid   = document.getElementById('notes-grid');
