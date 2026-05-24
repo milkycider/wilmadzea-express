@@ -998,6 +998,16 @@
       border-top: 1px solid var(--accent2);
       margin-top: 2px;
     }
+    .loc-cell-explored-mark {
+      position: absolute;
+      top: 2px;
+      right: 3px;
+      font-size: 9px;
+      color: rgba(39,174,96,0.95);
+      pointer-events: none;
+      z-index: 1;
+      line-height: 1;
+    }
     .loc-cell-add-note {
       position: absolute;
       bottom: 2px;
@@ -1024,13 +1034,13 @@
       margin-bottom: 2px;
       background: var(--bg3);
       cursor: pointer;
-      overflow: hidden;
       white-space: nowrap;
       transition: background 0.15s;
+      max-width: 100%;
     }
     .loc-char-chip:hover { background: var(--bg4); }
     .loc-char-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-    .loc-chip-explored { margin-left: auto; font-size: 8px; color: rgba(39,174,96,0.95); flex-shrink: 0; }
+    .loc-chip-explored { font-size: 8px; color: rgba(39,174,96,0.9); flex-shrink: 0; margin-left: 2px; }
     /* カード非表示モード */
     #loctimeline-wrap.hide-chips .loc-char-chip { display: none; }
 
@@ -2053,6 +2063,12 @@
       <button class="modal-close" onclick="closeModal('locnote-modal')">×</button>
     </div>
     <div class="modal-body">
+      <div class="form-group" style="margin-bottom:8px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+          <input type="checkbox" id="locnote-explored" style="width:16px;height:16px;accent-color:var(--green);">
+          <span style="font-size:12px;color:var(--text2);">✔ 探索済み（全ループ共通）</span>
+        </label>
+      </div>
       <div class="form-group">
         <label>メモ（探索可能な場所の情報・特記事項など）</label>
         <textarea id="locnote-memo" class="chardata-memo" placeholder="例: 施錠された引き出しあり&#10;窓から隣の車両に移動可能&#10;NPC〇〇が常駐している…"></textarea>
@@ -4338,7 +4354,7 @@ function renderLocTimeline() {
           // このスロットで探索済みかチェック
           const _bundle = normalizeSlotBundle((timelineData[ch.id] || {})[slot.key] || {});
           const _explored = Object.entries(_bundle).some(([lk, d]) => {
-            if (!d || !hasEntryContent(d)) return false;
+            if (!d) return false;
             if (activeLoopFilter !== null && lk !== '_' && String(lk) !== String(activeLoopFilter)) return false;
             return !!d.explored;
           });
@@ -4373,15 +4389,23 @@ function renderLocTimeline() {
         });
       }
 
-      // メモ表示（全モード共通）
+      // メモ・探索済み表示（全モード共通）
       if (!isUnassigned) {
         const locSlotNote = (locationNotes[locName] || {})[slot.key];
-        if (locSlotNote && locSlotNote.memo) {
-          td.classList.add('has-note');
-          const noteDiv = document.createElement('div');
-          noteDiv.className = 'loc-cell-note';
-          noteDiv.textContent = locSlotNote.memo;
-          td.appendChild(noteDiv);
+        if (locSlotNote) {
+          if (locSlotNote.memo) {
+            td.classList.add('has-note');
+            const noteDiv = document.createElement('div');
+            noteDiv.className = 'loc-cell-note';
+            noteDiv.textContent = locSlotNote.memo;
+            td.appendChild(noteDiv);
+          }
+          if (locSlotNote.explored) {
+            const mark = document.createElement('span');
+            mark.className = 'loc-cell-explored-mark';
+            mark.textContent = '✔';
+            td.appendChild(mark);
+          }
         }
         const dayLabel = slot.day === 0 ? '出発日 ' + slot.label : 'D' + slot.day + ' ' + slot.label;
         td.addEventListener('click', function() {
@@ -4416,31 +4440,37 @@ function openLocNoteModal(locName, slotKey, slotLabel) {
   const locData = locationNotes[locName] || {};
   const note = slotKey ? (locData[slotKey] || {}) : {};
   document.getElementById('locnote-memo').value = note.memo || '';
+  document.getElementById('locnote-explored').checked = !!note.explored;
   document.getElementById('locnote-modal').classList.add('open');
   setTimeout(() => document.getElementById('locnote-memo').focus(), 50);
 }
 
 function saveLocNote() {
   if (!editingLocName || !editingLocSlot) return;
-  const memo = document.getElementById('locnote-memo').value.trim();
-  // Firebase キーに使えない文字だけ置換（日本語はそのままOK）
-  const safeKey = editingLocName.replace(/[.$#[\]/]/g, '_');
+  const memo     = document.getElementById('locnote-memo').value.trim();
+  const explored = document.getElementById('locnote-explored').checked;
+  const safeKey  = editingLocName.replace(/[.$#[\]/]/g, '_');
   if (!locationNotes[editingLocName]) locationNotes[editingLocName] = {};
-  if (memo) {
-    locationNotes[editingLocName][editingLocSlot] = { memo, updatedAt: Date.now() };
+
+  const hasContent = memo || explored;
+  if (hasContent) {
+    const entry = { updatedAt: Date.now() };
+    if (memo)     entry.memo     = memo;
+    if (explored) entry.explored = true;
+    locationNotes[editingLocName][editingLocSlot] = entry;
+    if (!isOffline && db) {
+      db.ref('locationNotes/' + safeKey + '/' + editingLocSlot).set(entry);
+    }
   } else {
     delete locationNotes[editingLocName][editingLocSlot];
     if (Object.keys(locationNotes[editingLocName]).length === 0)
       delete locationNotes[editingLocName];
-  }
-  if (!isOffline && db) {
-    const path = 'locationNotes/' + safeKey + '/' + editingLocSlot;
-    if (memo) {
-      db.ref(path).set({ memo, updatedAt: Date.now() });
-    } else {
-      db.ref(path).remove();
+    if (!isOffline && db) {
+      db.ref('locationNotes/' + safeKey + '/' + editingLocSlot).remove();
     }
-  } else {
+  }
+
+  if (isOffline) {
     const saved = sessionStorage.getItem('wex_timeline');
     const parsed = saved ? JSON.parse(saved) : {};
     parsed.locationNotes = locationNotes;
