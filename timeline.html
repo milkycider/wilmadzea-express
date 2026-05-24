@@ -1030,6 +1030,7 @@
     }
     .loc-char-chip:hover { background: var(--bg4); }
     .loc-char-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .loc-chip-explored { margin-left: auto; font-size: 8px; color: rgba(39,174,96,0.95); flex-shrink: 0; }
     /* カード非表示モード */
     #loctimeline-wrap.hide-chips .loc-char-chip { display: none; }
 
@@ -2335,6 +2336,7 @@ let locationList = [];
 let notes = {}; // { noteId: { id, title, body, tags, timeRef, charId, createdAt, updatedAt } }
 let notesOrder = [];     // ドラッグ並び替え順 — note ID の配列
 let resourcesOrder = []; // ドラッグ並び替え順 — resource ID の配列
+let itemsOrder = [];     // ドラッグ並び替え順 — item ID の配列
 let charNotes = {}; // { charId: { memo, updatedAt } }
 let items = {}; // { itemId: { id, name, cat, owner, desc, memo, memoUpdatedAt, createdAt } }
 let editingItemId = null;
@@ -2563,6 +2565,11 @@ function initFirebase(cfg) {
       renderResources();
     });
 
+    db.ref('itemsOrder').on('value', snap => {
+      itemsOrder = snap.val() || [];
+      if (document.getElementById('tab-items').classList.contains('active')) renderItems();
+    });
+
     isOffline = false;
     return true;
   } catch (e) {
@@ -2594,6 +2601,7 @@ function initOffline() {
       positionData   = parsed.positionData   || {};
       notesOrder     = parsed.notesOrder     || [];
       resourcesOrder = parsed.resourcesOrder || [];
+      itemsOrder     = parsed.itemsOrder     || [];
       if (parsed.rooms) rooms = normalizeRooms(parsed.rooms);
     } catch(e) {}
   }
@@ -2616,6 +2624,7 @@ function saveOffline() {
     positionData,
     notesOrder,
     resourcesOrder,
+    itemsOrder,
   }));
 }
 
@@ -4216,7 +4225,7 @@ function renderLocTimeline() {
         addedForSlot.add(key);
         if (!locIndex[key]) locIndex[key] = {};
         if (!locIndex[key][slotKey]) locIndex[key][slotKey] = [];
-        locIndex[key][slotKey].push({ charId, ...chInfo });
+        locIndex[key][slotKey].push({ charId, ...chInfo, explored: !!data.explored });
       });
     });
   });
@@ -4348,7 +4357,7 @@ function renderLocTimeline() {
           chip.title = ch.name;
           const dname = ch.displayName || ch.name;
           const shortName = dname.length > 9 ? dname.slice(0, 8) + '…' : dname;
-          chip.innerHTML = `<span class="loc-char-dot" style="background:${escHtml(ch.color)}"></span>${escHtml(shortName)}`;
+          chip.innerHTML = `<span class="loc-char-dot" style="background:${escHtml(ch.color)}"></span>${escHtml(shortName)}${ch.explored ? '<span class="loc-chip-explored">✔</span>' : ''}`;
           chip.addEventListener('click', (e) => {
             e.stopPropagation();
             openLocChipModal(ch.charId, ch.name, ch.color, slot.key, slot.label, slot.day);
@@ -4618,9 +4627,17 @@ function renderItems() {
 
   body.innerHTML = '';
 
-  const allItems = Object.values(items).sort(function(a, b) {
-    return (a.createdAt || 0) - (b.createdAt || 0);
-  });
+  const allItems = Object.values(items);
+  if (itemsOrder.length > 0 && !q) {
+    const orderMap = Object.fromEntries(itemsOrder.map(function(id, i) { return [id, i]; }));
+    allItems.sort(function(a, b) {
+      const ai = orderMap[a.id] !== undefined ? orderMap[a.id] : 999999;
+      const bi = orderMap[b.id] !== undefined ? orderMap[b.id] : 999999;
+      return ai !== bi ? ai - bi : (a.createdAt || 0) - (b.createdAt || 0);
+    });
+  } else {
+    allItems.sort(function(a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+  }
 
   const filtered = allItems.filter(function(item) {
     if (!q) return true;
@@ -4643,6 +4660,7 @@ function renderItems() {
   filtered.forEach(function(item) {
     const card = document.createElement('div');
     card.className = 'item-card';
+    card.dataset.itemId = item.id;
 
     // ── header ──
     const header = document.createElement('div');
@@ -4757,6 +4775,19 @@ function renderItems() {
     card.appendChild(cardBody);
     body.appendChild(card);
   });
+
+  if (!q) {
+    attachDragSort(body, '.item-card', 'itemId', saveItemsOrder);
+  }
+}
+
+function saveItemsOrder(orderedIds) {
+  itemsOrder = orderedIds;
+  if (!isOffline && db) {
+    db.ref('itemsOrder').set(orderedIds);
+  } else {
+    saveOffline();
+  }
 }
 
 // ═══════════════════════════════════════════════════
