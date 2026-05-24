@@ -43,7 +43,7 @@
       --orange: #e67e22;
       --modal-bg: rgba(0,0,0,0.85);
       --cell-w: 130px;
-      --name-w: 180px;
+      --name-w: 200px;
       --row-h: 60px;
       --header-h: 52px;
     }
@@ -273,7 +273,8 @@
 
     /* Event rows */
     .char-row.event-row td { height: var(--row-h); }
-    .char-row.event-row .col-name { background: rgba(200,146,42,0.07); border-left: 3px solid var(--accent2); }
+    /* col-name は sticky なので背景は不透明にする（透過だとスクロール時に縦線が透ける） */
+    .char-row.event-row .col-name { background: #1c1710; border-left: 3px solid var(--accent2); }
 
     /* Drag over indicator */
     .char-row.drag-over td { border-top: 2px solid var(--accent); }
@@ -292,6 +293,7 @@
       display: flex;
       align-items: center;
       gap: 5px;
+      position: relative; /* char-controls の絶対配置の基準 */
     }
     .char-dot {
       width: 8px; height: 8px;
@@ -314,17 +316,24 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    /* Controls shown on hover */
+    /* Controls shown on hover — absolutely positioned so they don't squish the name */
     .char-controls {
+      position: absolute;
+      right: 2px;
+      top: 50%;
+      transform: translateY(-50%);
       display: flex;
       align-items: center;
       gap: 1px;
-      margin-left: auto;
-      flex-shrink: 0;
       opacity: 0;
       transition: opacity 0.15s;
+      background: var(--bg2); /* 下のテキストを隠す */
+      border-radius: 4px;
+      padding: 0 2px;
     }
     .col-name:hover .char-controls { opacity: 1; }
+    /* event-row の char-controls は背景色を合わせる */
+    .char-row.event-row .col-name:hover .char-controls { background: #1c1710; }
     .char-ctrl-btn {
       background: none;
       border: none;
@@ -820,6 +829,52 @@
     .loc-char-chip:hover { background: var(--bg4); }
     .loc-char-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
     .loc-row-unassigned .loc-name-cell { color: var(--text3); font-style: italic; font-weight: normal; }
+
+    /* Location chip modal body */
+    .loc-chip-field { margin-bottom: 10px; }
+    .loc-chip-field label { font-size: 10px; color: var(--text3); letter-spacing: .05em; display: block; margin-bottom: 2px; }
+    .loc-chip-field .val { font-size: 12px; color: var(--text); white-space: pre-wrap; }
+
+    /* Location list reorder buttons */
+    .location-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .loc-order-btn {
+      background: none;
+      border: none;
+      color: var(--text3);
+      font-size: 10px;
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
+    }
+    .loc-order-btn:hover { color: var(--accent); }
+
+    /* Note time picker */
+    .note-time-picker {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .note-time-picker select {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 4px;
+      padding: 5px 8px;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .note-time-picker select:focus { outline: none; border-color: var(--accent2); }
+    .note-time-preview {
+      font-size: 11px;
+      color: var(--accent);
+      min-width: 60px;
+    }
 
     /* ── Notes Tab ── */
     #notes-panel {
@@ -1335,8 +1390,17 @@
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>時刻参照 <span style="color:var(--text3);font-size:10px;">自由記述</span></label>
-          <input type="text" id="note-time-ref-input" placeholder="例：出発日 15:00頃">
+          <label>時刻参照 <span style="color:var(--text3);font-size:10px;">例: D0 15:00</span></label>
+          <div class="note-time-picker">
+            <select id="note-day-select" onchange="updateNoteTimePreview()">
+              <option value="">─ 日</option>
+              <!-- buildNoteDayOptions() で生成 -->
+            </select>
+            <select id="note-hour-select" onchange="updateNoteTimePreview()">
+              <option value="">── 時</option>
+            </select>
+            <span class="note-time-preview" id="note-time-preview"></span>
+          </div>
         </div>
         <div class="form-group">
           <label>関連キャラクター</label>
@@ -1348,6 +1412,24 @@
       <button class="toolbar-btn" id="note-delete-btn" style="color:var(--red);border-color:var(--red);display:none;" onclick="deleteNoteConfirm()">削除</button>
       <button class="toolbar-btn" onclick="closeModal('note-modal')">キャンセル</button>
       <button class="toolbar-btn primary" onclick="saveNote()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Location Chip Detail Modal ═══ -->
+<div class="modal-overlay" id="loc-chip-modal">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-header">
+      <div>
+        <h2 id="loc-chip-modal-title"></h2>
+        <div class="sub" id="loc-chip-modal-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('loc-chip-modal')">×</button>
+    </div>
+    <div class="modal-body" id="loc-chip-modal-body" style="padding:16px;"></div>
+    <div class="modal-footer">
+      <button class="toolbar-btn" onclick="jumpToCharCell()">📋 キャラクタータイムラインで見る →</button>
+      <button class="toolbar-btn primary" onclick="closeModal('loc-chip-modal')">閉じる</button>
     </div>
   </div>
 </div>
@@ -2164,7 +2246,13 @@ function fillRoomSelect(selectedRoomId, includeEventRooms) {
 
 function onRoomSelectChange() {
   const val = document.getElementById('new-char-room').value;
-  document.getElementById('new-room-name-group').style.display = val === '__new__' ? 'block' : 'none';
+  // __new__（通常キャラ）または __new_event__（イベントグループ）のどちらでも名前入力欄を表示
+  const showNameInput = val === '__new__' || val === '__new_event__';
+  document.getElementById('new-room-name-group').style.display = showNameInput ? 'block' : 'none';
+  if (showNameInput) {
+    const lbl = document.querySelector('#new-room-name-group label');
+    if (lbl) lbl.textContent = val === '__new_event__' ? '新しいイベントグループの名前' : '新しいグループの名前';
+  }
 }
 
 function openAddCharModal() {
@@ -2198,18 +2286,21 @@ function openAddEventRowModal() {
   // Fill room select with event rooms only (or all rooms)
   const sel = document.getElementById('new-char-room');
   sel.innerHTML = '';
-  const evRoom = rooms.find(r => r.id === 'room_events');
-  if (evRoom) {
+  // 既存のイベントルームをすべて列挙
+  rooms.filter(r => r.isEventRoom).forEach(r => {
     const opt = document.createElement('option');
-    opt.value = 'room_events';
-    opt.textContent = evRoom.name;
-    opt.selected = true;
+    opt.value = r.id;
+    opt.textContent = r.name;
     sel.appendChild(opt);
-  }
+  });
   const newOpt = document.createElement('option');
   newOpt.value = '__new_event__';
   newOpt.textContent = '＋ 新しいイベントグループを追加…';
   sel.appendChild(newOpt);
+
+  // 初期状態でグループ名入力欄を非表示に
+  document.getElementById('new-room-name-group').style.display = 'none';
+  document.getElementById('new-room-name-input').value = '';
 
   document.getElementById('char-modal').classList.add('open');
   setTimeout(() => document.getElementById('new-char-name').focus(), 50);
@@ -2295,9 +2386,10 @@ function saveNewEventRow() {
   const newChar = { id: charId, name, isEvent: true, color: '#c8922a' };
 
   if (roomSel === '__new_event__') {
+    const groupName = document.getElementById('new-room-name-input').value.trim() || 'イベント ' + name;
     const newRoom = {
       id: 'revt' + Date.now(),
-      name: 'イベント ' + name,
+      name: groupName,
       isEventRoom: true,
       color: '#c8922a',
       collapsed: false,
@@ -2398,8 +2490,18 @@ function addLocation() {
   updateLocationDatalist();
 }
 
-function removeLocation(loc) {
-  locationList = locationList.filter(l => l !== loc);
+function removeLocation(idx) {
+  locationList.splice(idx, 1);
+  saveLocationList();
+  renderLocationList();
+  updateLocationDatalist();
+}
+
+function moveLocation(idx, dir) {
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= locationList.length) return;
+  const [item] = locationList.splice(idx, 1);
+  locationList.splice(newIdx, 0, item);
   saveLocationList();
   renderLocationList();
   updateLocationDatalist();
@@ -2419,8 +2521,13 @@ function renderLocationList() {
     container.innerHTML = '<span style="color:var(--text3);font-size:11px;">まだ場所が登録されていません</span>';
     return;
   }
-  container.innerHTML = locationList.map(loc =>
-    `<span class="location-tag">${escHtml(loc)}<button class="location-tag-remove" onclick="removeLocation('${escHtml(loc)}')">×</button></span>`
+  container.innerHTML = locationList.map((loc, i) =>
+    `<span class="location-tag">` +
+    `<button class="loc-order-btn" onclick="moveLocation(${i},-1)" title="上へ" ${i===0?'style="opacity:.3;cursor:default"':''}>▲</button>` +
+    `<button class="loc-order-btn" onclick="moveLocation(${i},1)"  title="下へ" ${i===locationList.length-1?'style="opacity:.3;cursor:default"':''}>▼</button>` +
+    `${escHtml(loc)}` +
+    `<button class="location-tag-remove" onclick="removeLocation(${i})" title="削除">×</button>` +
+    `</span>`
   ).join('');
 }
 
@@ -2755,16 +2862,9 @@ function renderLocTimeline() {
         chip.title = ch.name;
         const shortName = ch.name.length > 9 ? ch.name.slice(0, 8) + '…' : ch.name;
         chip.innerHTML = `<span class="loc-char-dot" style="background:${escHtml(ch.color)}"></span>${escHtml(shortName)}`;
-        // クリックでキャラクタータイムラインの該当セルへジャンプ
+        // クリックでカード詳細モーダルを表示
         chip.addEventListener('click', () => {
-          switchTab('timeline');
-          const el = document.getElementById(`cell-${ch.charId}-${slot.key}`);
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-            el.style.outline = '2px solid var(--accent)';
-            el.style.outlineOffset = '-2px';
-            setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 1800);
-          }
+          openLocChipModal(ch.charId, ch.name, ch.color, slot.key, slot.label, slot.day);
         });
         td.appendChild(chip);
       });
@@ -2776,6 +2876,63 @@ function renderLocTimeline() {
 
   wrap.innerHTML = '';
   wrap.appendChild(table);
+}
+
+// ═══════════════════════════════════════════════════
+// LOCATION CHIP MODAL
+// ═══════════════════════════════════════════════════
+
+let locChipTarget = null; // { charId, slotKey }
+
+function openLocChipModal(charId, charName, charColor, slotKey, slotLabel, slotDay) {
+  const data = (timelineData[charId] || {})[slotKey] || {};
+  locChipTarget = { charId, slotKey };
+
+  const dayLabel = slotDay === 0 ? '出発日' : `D${slotDay}（翌日）`;
+  document.getElementById('loc-chip-modal-title').innerHTML =
+    `<span style="color:${escHtml(charColor)}">●</span> ${escHtml(charName)}`;
+  document.getElementById('loc-chip-modal-sub').textContent = `${dayLabel} ${slotLabel}`;
+
+  // ボディ構築
+  const fields = [];
+  if (data.location)   fields.push(['📍 場所',     data.location,   'var(--accent)']);
+  if (data.timeDetail) fields.push(['🕐 詳細時刻',  data.timeDetail, '']);
+  if (data.action)     fields.push(['🎭 行動・状況', data.action,    '']);
+  if (data.info)       fields.push(['ℹ 情報・発見',  data.info,      'var(--teal)']);
+  if (data.notes)      fields.push(['📝 メモ',       data.notes,     'var(--text2)']);
+
+  let html = '';
+  if (data.status) {
+    html += `<div class="loc-chip-field"><label>状態</label><span class="status-badge status-${escHtml(data.status)}">${escHtml(STATUS_LABELS[data.status] || data.status)}</span></div>`;
+  }
+  fields.forEach(([lbl, val, col]) => {
+    html += `<div class="loc-chip-field"><label>${lbl}</label><div class="val" style="${col ? 'color:'+col : ''}">${escHtml(val)}</div></div>`;
+  });
+  if (data.tags && data.tags.length) {
+    html += `<div class="loc-chip-field"><label>タグ</label><div>${data.tags.map(t => `<span class="note-tag">${escHtml(t)}</span>`).join(' ')}</div></div>`;
+  }
+  if (!fields.length && !data.status && !(data.tags && data.tags.length)) {
+    html = '<div style="color:var(--text3);font-size:12px;padding:4px 0;">このセルにはまだデータがありません。</div>';
+  }
+
+  document.getElementById('loc-chip-modal-body').innerHTML = html;
+  document.getElementById('loc-chip-modal').classList.add('open');
+}
+
+function jumpToCharCell() {
+  if (!locChipTarget) return;
+  const { charId, slotKey } = locChipTarget;
+  closeModal('loc-chip-modal');
+  switchTab('timeline');
+  setTimeout(() => {
+    const el = document.getElementById(`cell-${charId}-${slotKey}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      el.style.outline = '2px solid var(--accent)';
+      el.style.outlineOffset = '-2px';
+      setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 1800);
+    }
+  }, 120);
 }
 
 // ═══════════════════════════════════════════════════
@@ -2823,19 +2980,73 @@ function renderNotes() {
     const card = document.createElement('div');
     card.className = 'note-card';
     card.dataset.noteId = note.id;
-    card.innerHTML = `
-      <div class="note-card-actions">
-        <button class="note-action-btn" onclick="openEditNoteModal('${escHtml(note.id)}');event.stopPropagation()">編集</button>
-        <button class="note-action-btn" style="color:var(--red)" onclick="deleteNoteById('${escHtml(note.id)}');event.stopPropagation()">削除</button>
-      </div>
-      <div class="note-card-title">${escHtml(note.title || '（無題）')}</div>
-      <div class="note-card-body">${escHtml(note.body || '')}</div>
-      <div class="note-card-meta">${tagsHtml}${timeHtml}${charHtml}</div>
-      ${updatedStr ? `<div class="note-updated">更新: ${updatedStr}</div>` : ''}
-    `;
+    card.innerHTML =
+      '<div class="note-card-actions">' +
+      '<button class="note-action-btn" onclick="openEditNoteModal(\'' + escHtml(note.id) + '\');event.stopPropagation()">編集</button>' +
+      '<button class="note-action-btn" style="color:var(--red)" onclick="deleteNoteById(\'' + escHtml(note.id) + '\');event.stopPropagation()">削除</button>' +
+      '</div>' +
+      '<div class="note-card-title">' + escHtml(note.title || '（無題）') + '</div>' +
+      '<div class="note-card-body">' + escHtml(note.body || '') + '</div>' +
+      '<div class="note-card-meta">' + tagsHtml + timeHtml + charHtml + '</div>' +
+      (updatedStr ? '<div class="note-updated">更新: ' + updatedStr + '</div>' : '');
     card.addEventListener('click', () => openEditNoteModal(note.id));
     grid.appendChild(card);
   });
+}
+
+// ═══════════════════════════════════════════════════
+// NOTES — 時刻セレクト
+// ═══════════════════════════════════════════════════
+
+function buildNoteTimeSelects() {
+  const daySet = new Set();
+  TIME_SLOTS.forEach(s => daySet.add(s.day));
+  const daySel = document.getElementById('note-day-select');
+  const hrSel  = document.getElementById('note-hour-select');
+  const curDay = daySel.value;
+  const curHr  = hrSel.value;
+  daySel.innerHTML = '<option value="">─ 日</option>';
+  daySet.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d;
+    opt.textContent = d === 0 ? 'D0（出発日）' : 'D' + d + '（翌日）';
+    daySel.appendChild(opt);
+  });
+  hrSel.innerHTML = '<option value="">── 時</option>';
+  for (let h = 0; h <= 23; h++) {
+    const opt = document.createElement('option');
+    opt.value = h;
+    opt.textContent = String(h).padStart(2,'0') + ':00';
+    hrSel.appendChild(opt);
+  }
+  if (curDay !== '') daySel.value = curDay;
+  if (curHr  !== '') hrSel.value  = curHr;
+  updateNoteTimePreview();
+}
+
+function updateNoteTimePreview() {
+  const d = document.getElementById('note-day-select').value;
+  const h = document.getElementById('note-hour-select').value;
+  const preview = document.getElementById('note-time-preview');
+  if (d !== '' && h !== '') {
+    preview.textContent = '→ D' + d + ' ' + String(Number(h)).padStart(2,'0') + ':00';
+  } else {
+    preview.textContent = '';
+  }
+}
+
+function getNoteTimeRef() {
+  const d = document.getElementById('note-day-select').value;
+  const h = document.getElementById('note-hour-select').value;
+  if (d === '' || h === '') return '';
+  return 'D' + d + ' ' + String(Number(h)).padStart(2,'0') + ':00';
+}
+
+function setNoteTimeSelects(timeRef) {
+  const m = timeRef ? timeRef.match(/^D(\d+)\s+(\d+):/) : null;
+  document.getElementById('note-day-select').value  = m ? m[1] : '';
+  document.getElementById('note-hour-select').value = m ? String(Number(m[2])) : '';
+  updateNoteTimePreview();
 }
 
 function openAddNoteModal() {
@@ -2844,7 +3055,8 @@ function openAddNoteModal() {
   document.getElementById('note-title-input').value = '';
   document.getElementById('note-body-input').value  = '';
   document.getElementById('note-tags-input').value  = '';
-  document.getElementById('note-time-ref-input').value = '';
+  buildNoteTimeSelects();
+  setNoteTimeSelects('');
   populateNoteCharSelect('');
   document.getElementById('note-delete-btn').style.display = 'none';
   document.getElementById('note-modal').classList.add('open');
@@ -2859,7 +3071,8 @@ function openEditNoteModal(noteId) {
   document.getElementById('note-title-input').value = note.title    || '';
   document.getElementById('note-body-input').value  = note.body     || '';
   document.getElementById('note-tags-input').value  = (note.tags || []).join(', ');
-  document.getElementById('note-time-ref-input').value = note.timeRef || '';
+  buildNoteTimeSelects();
+  setNoteTimeSelects(note.timeRef || '');
   populateNoteCharSelect(note.charId || '');
   document.getElementById('note-delete-btn').style.display = 'inline-block';
   document.getElementById('note-modal').classList.add('open');
@@ -2869,11 +3082,11 @@ function openEditNoteModal(noteId) {
 function populateNoteCharSelect(selectedId) {
   const sel = document.getElementById('note-char-select');
   sel.innerHTML = '<option value="">（なし）</option>';
-  rooms.forEach(room => {
-    room.chars.forEach(ch => {
+  rooms.forEach(function(room) {
+    room.chars.forEach(function(ch) {
       const opt = document.createElement('option');
       opt.value = ch.id;
-      opt.textContent = `${ch.name}${room.name ? '（' + room.name + '）' : ''}`;
+      opt.textContent = ch.name + '（' + room.name + '）';
       if (ch.id === selectedId) opt.selected = true;
       sel.appendChild(opt);
     });
@@ -2884,16 +3097,17 @@ function saveNote() {
   const title   = document.getElementById('note-title-input').value.trim();
   const body    = document.getElementById('note-body-input').value.trim();
   const tagsRaw = document.getElementById('note-tags-input').value.trim();
-  const tags    = tagsRaw ? tagsRaw.split(/[,、]/).map(t => t.trim()).filter(Boolean) : [];
-  const timeRef = document.getElementById('note-time-ref-input').value.trim();
+  const tags    = tagsRaw ? tagsRaw.split(/[,、]/).map(function(t){ return t.trim(); }).filter(Boolean) : [];
+  const timeRef = getNoteTimeRef();
   const charId  = document.getElementById('note-char-select').value;
 
   if (!title && !body) { document.getElementById('note-title-input').focus(); return; }
 
-  const noteId    = editingNoteId || ('n' + Date.now());
-  const existing  = notes[noteId] || {};
-  const noteData  = {
-    id: noteId, title, body, tags, timeRef, charId,
+  const noteId   = editingNoteId || ('n' + Date.now());
+  const existing = notes[noteId] || {};
+  const noteData = {
+    id: noteId, title: title, body: body, tags: tags,
+    timeRef: timeRef, charId: charId,
     createdAt: existing.createdAt || Date.now(),
     updatedAt: Date.now(),
   };
@@ -2901,7 +3115,7 @@ function saveNote() {
   notes[noteId] = noteData;
 
   if (!isOffline && db) {
-    db.ref(`notes/${noteId}`).set(noteData);
+    db.ref('notes/' + noteId).set(noteData);
   } else {
     saveOffline();
     renderNotes();
@@ -2919,7 +3133,7 @@ function deleteNoteById(noteId) {
   if (!confirm('このメモを削除しますか？')) return;
   delete notes[noteId];
   if (!isOffline && db) {
-    db.ref(`notes/${noteId}`).remove();
+    db.ref('notes/' + noteId).remove();
   } else {
     saveOffline();
     renderNotes();
@@ -2931,13 +3145,13 @@ function deleteNoteById(noteId) {
 // ═══════════════════════════════════════════════════
 
 function exportData() {
-  const data = { rooms, timeline: timelineData, resources, locationList, notes, exportedAt: Date.now() };
+  const data = { rooms: rooms, timeline: timelineData, resources: resources, locationList: locationList, notes: notes, exportedAt: Date.now() };
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href = url;
-  a.download = `wex_timeline_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = 'wex_timeline_' + new Date().toISOString().slice(0,10) + '.json';
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -2946,7 +3160,7 @@ function importData(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = function(e) {
     try {
       const data = JSON.parse(e.target.result);
       if (data.rooms) {
