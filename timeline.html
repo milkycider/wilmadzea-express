@@ -975,6 +975,10 @@
     /* location notes modal */
     #locnote-modal .modal-box { max-width: 480px; }
     #locnote-memo { min-height: 140px; resize: vertical; width: 100%; }
+    /* 人メモ modal */
+    #char-slot-note-modal .modal-box { max-width: 460px; }
+    #char-slot-note-memo { min-height: 140px; resize: vertical; width: 100%; }
+    .char-slot-note-header-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; flex-shrink:0; vertical-align:middle; }
 
     .loc-cell {
       width: var(--cell-w);
@@ -2187,6 +2191,30 @@
   </div>
 </div>
 
+<!-- ═══ 人メモ Modal（位置管理タグクリック） ═══ -->
+<div class="modal-overlay" id="char-slot-note-modal">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-header">
+      <div>
+        <h2 id="char-slot-note-modal-title" style="display:flex;align-items:center;"></h2>
+        <div class="sub" id="char-slot-note-modal-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('char-slot-note-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>人メモ（このキャラ・このスロット固有のメモ）</label>
+        <textarea id="char-slot-note-memo" class="chardata-memo" placeholder="例: 13時にトラクトと接触済み&#10;このコマで隣の車両へ移動しているはず…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="toolbar-btn" onclick="jumpToCharCellFromPosModal()">📋 キャラクタータイムラインで見る →</button>
+      <button class="toolbar-btn" onclick="closeModal('char-slot-note-modal')">キャンセル</button>
+      <button class="toolbar-btn primary" onclick="saveCharSlotNote()">保存</button>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 
@@ -2353,6 +2381,8 @@ let notes = {}; // { noteId: { id, title, body, tags, timeRef, charId, createdAt
 let notesOrder = [];     // ドラッグ並び替え順 — note ID の配列
 let resourcesOrder = []; // ドラッグ並び替え順 — resource ID の配列
 let itemsOrder = [];     // ドラッグ並び替え順 — item ID の配列
+let charSlotNotes = {}; // { charId: { slotKey: { memo, updatedAt } } } — 人メモ
+let editingCharSlotNote = null; // { charId, slotKey, charName, charColor, slotLabel }
 let charNotes = {}; // { charId: { memo, updatedAt } }
 let items = {}; // { itemId: { id, name, cat, owner, desc, memo, memoUpdatedAt, createdAt } }
 let editingItemId = null;
@@ -2571,6 +2601,10 @@ function initFirebase(cfg) {
       if (locViewMode === 'pos' && document.getElementById('tab-loctimeline').classList.contains('active')) renderLocTimeline();
     });
 
+    db.ref('charSlotNotes').on('value', snap => {
+      charSlotNotes = snap.val() || {};
+    });
+
     db.ref('notesOrder').on('value', snap => {
       notesOrder = snap.val() || [];
       if (document.getElementById('tab-notes').classList.contains('active')) renderNotes();
@@ -2618,6 +2652,7 @@ function initOffline() {
       notesOrder     = parsed.notesOrder     || [];
       resourcesOrder = parsed.resourcesOrder || [];
       itemsOrder     = parsed.itemsOrder     || [];
+      charSlotNotes  = parsed.charSlotNotes  || {};
       if (parsed.rooms) rooms = normalizeRooms(parsed.rooms);
     } catch(e) {}
   }
@@ -2641,6 +2676,7 @@ function saveOffline() {
     notesOrder,
     resourcesOrder,
     itemsOrder,
+    charSlotNotes,
   }));
 }
 
@@ -4349,6 +4385,7 @@ function renderLocTimeline() {
           if (slotPos[ch.id] !== locName) return;
           const tag = document.createElement('span');
           tag.className = 'loc-pos-tag';
+          tag.style.cursor = 'pointer';
           const dname = ch.displayName || ch.name;
           const shortName = dname.length > 9 ? dname.slice(0, 8) + '…' : dname;
           // このスロットで探索済みかチェック
@@ -4358,11 +4395,18 @@ function renderLocTimeline() {
             if (activeLoopFilter !== null && lk !== '_' && String(lk) !== String(activeLoopFilter)) return false;
             return !!d.explored;
           });
-          tag.innerHTML = `<span class="loc-pos-tag-dot" style="background:${escHtml(ch.color||'#888')}"></span>${escHtml(shortName)}${_explored ? '<span class="loc-chip-explored">✔</span>' : ''}<span class="loc-pos-tag-remove" title="外す">×</span>`;
+          // 人メモがあればドット表示
+          const _hasMemo = !!((charSlotNotes[ch.id] || {})[slot.key] || {}).memo;
+          tag.innerHTML = `<span class="loc-pos-tag-dot" style="background:${escHtml(ch.color||'#888')}"></span>${escHtml(shortName)}${_explored ? '<span class="loc-chip-explored">✔</span>' : ''}${_hasMemo ? '<span class="loc-chip-explored" style="color:var(--accent2);margin-left:1px;" title="人メモあり">✎</span>' : ''}<span class="loc-pos-tag-remove" title="外す">×</span>`;
           tag.querySelector('.loc-pos-tag-remove').onclick = (e) => {
             e.stopPropagation();
             removeCharFromPos(ch.id, slot.key);
           };
+          tag.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const slotDayLabel = slot.day === 0 ? '出発日' : 'D' + slot.day;
+            openCharSlotNoteModal(ch.id, ch.displayName || ch.name, ch.color || '#888', slot.key, slot.label, slot.day);
+          });
           td.appendChild(tag);
         });
         // ＋ 追加ボタン
@@ -4536,6 +4580,66 @@ function jumpToCharCell() {
   if (!locChipTarget) return;
   const { charId, slotKey } = locChipTarget;
   closeModal('loc-chip-modal');
+  switchTab('timeline');
+  setTimeout(() => {
+    const el = document.getElementById(`cell-${charId}-${slotKey}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      el.style.outline = '2px solid var(--accent)';
+      el.style.outlineOffset = '-2px';
+      setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 1800);
+    }
+  }, 120);
+}
+
+// ─── 人メモ Modal ───────────────────────────────────
+function openCharSlotNoteModal(charId, charName, charColor, slotKey, slotLabel, slotDay) {
+  editingCharSlotNote = { charId, slotKey, charName, charColor, slotLabel, slotDay };
+  const dayLabel = slotDay === 0 ? '出発日 ' + slotLabel : 'D' + slotDay + ' ' + slotLabel;
+
+  // ヘッダー：カラードット＋名前
+  const titleEl = document.getElementById('char-slot-note-modal-title');
+  titleEl.innerHTML =
+    `<span class="char-slot-note-header-dot" style="background:${escHtml(charColor||'#888')}"></span>${escHtml(charName)}`;
+  document.getElementById('char-slot-note-modal-sub').textContent = dayLabel;
+
+  // 既存メモを読み込む
+  const existing = ((charSlotNotes[charId] || {})[slotKey] || {}).memo || '';
+  document.getElementById('char-slot-note-memo').value = existing;
+
+  document.getElementById('char-slot-note-modal').classList.add('open');
+  setTimeout(() => document.getElementById('char-slot-note-memo').focus(), 60);
+}
+
+function saveCharSlotNote() {
+  if (!editingCharSlotNote) return;
+  const { charId, slotKey } = editingCharSlotNote;
+  const memo = document.getElementById('char-slot-note-memo').value.trim();
+
+  if (!charSlotNotes[charId]) charSlotNotes[charId] = {};
+
+  if (memo) {
+    const entry = { memo, updatedAt: Date.now() };
+    charSlotNotes[charId][slotKey] = entry;
+    if (!isOffline && db) {
+      db.ref('charSlotNotes/' + charId + '/' + slotKey).set(entry);
+    } else { saveOffline(); }
+  } else {
+    delete charSlotNotes[charId][slotKey];
+    if (Object.keys(charSlotNotes[charId]).length === 0) delete charSlotNotes[charId];
+    if (!isOffline && db) {
+      db.ref('charSlotNotes/' + charId + '/' + slotKey).remove();
+    } else { saveOffline(); }
+  }
+
+  closeModal('char-slot-note-modal');
+}
+
+function jumpToCharCellFromPosModal() {
+  if (!editingCharSlotNote) return;
+  const { charId, slotKey } = editingCharSlotNote;
+  // 現在のメモを自動保存してから移動
+  saveCharSlotNote();
   switchTab('timeline');
   setTimeout(() => {
     const el = document.getElementById(`cell-${charId}-${slotKey}`);
