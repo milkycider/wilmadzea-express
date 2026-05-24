@@ -426,12 +426,12 @@
     }
     .timeline-cell.is-explored { border-bottom: 2px solid rgba(39,174,96,0.4); }
 
-    /* セル内状態ライン */
-    .timeline-cell.cell-st-alive    { border-top: 2px solid rgba(39,174,96,0.5);  }
-    .timeline-cell.cell-st-dead     { border-top: 2px solid rgba(180,83,75,0.6);  background: rgba(180,83,75,0.05) !important; }
-    .timeline-cell.cell-st-missing  { border-top: 2px solid rgba(230,126,34,0.55); background: rgba(230,126,34,0.04) !important; }
-    .timeline-cell.cell-st-unconscious { border-top: 2px solid rgba(155,89,182,0.5); background: rgba(155,89,182,0.04) !important; }
-    .timeline-cell.cell-st-suspicious  { border-top: 2px solid rgba(255,176,9,0.5);  background: rgba(255,176,9,0.03) !important; }
+    /* セル内状態（背景色のみ — ラインは探索済みと区別するため使わない） */
+    .timeline-cell.cell-st-alive       { background: rgba(39,174,96,0.08)  !important; }
+    .timeline-cell.cell-st-dead        { background: rgba(180,83,75,0.10)  !important; }
+    .timeline-cell.cell-st-missing     { background: rgba(230,126,34,0.09) !important; }
+    .timeline-cell.cell-st-unconscious { background: rgba(155,89,182,0.09) !important; }
+    .timeline-cell.cell-st-suspicious  { background: rgba(255,176,9,0.07)  !important; }
     .cell-content {
       font-size: 10px;
       line-height: 1.4;
