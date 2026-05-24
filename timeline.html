@@ -827,6 +827,52 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .loc-name-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      height: 100%;
+      justify-content: center;
+    }
+    .loc-name-top {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .loc-name-text {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .loc-memo-btn {
+      background: none;
+      border: none;
+      color: var(--text3);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 1px 3px;
+      border-radius: 3px;
+      opacity: 0;
+      transition: opacity 0.15s;
+      flex-shrink: 0;
+    }
+    .loc-name-cell:hover .loc-memo-btn { opacity: 1; }
+    .loc-memo-btn:hover { color: var(--accent); background: var(--bg3); }
+    .loc-name-preview {
+      font-size: 10px;
+      font-weight: normal;
+      color: var(--text3);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+    /* location notes modal */
+    #locnote-modal .modal-box { max-width: 480px; }
+    #locnote-memo { min-height: 140px; resize: vertical; width: 100%; }
+
     .loc-cell {
       width: var(--cell-w);
       min-width: var(--cell-w);
@@ -1637,6 +1683,26 @@
   </div>
 </div>
 
+<!-- ═══ LOCATION NOTE MODAL ═══ -->
+<div class="modal-overlay" id="locnote-modal">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-header">
+      <h2 id="locnote-modal-title">📍 場所メモ</h2>
+      <button class="modal-close" onclick="closeModal('locnote-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>メモ（探索可能な場所の情報・特記事項など）</label>
+        <textarea id="locnote-memo" class="chardata-memo" placeholder="例: 施錠された引き出しあり&#10;窓から隣の車両に移動可能&#10;NPC〇〇が常駐している…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="toolbar-btn" onclick="closeModal('locnote-modal')">キャンセル</button>
+      <button class="toolbar-btn primary" onclick="saveLocNote()">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ Note Edit Modal ═══ -->
 <!-- ═══ ITEM MODAL ═══ -->
 <div class="modal-overlay" id="item-modal">
@@ -1912,6 +1978,8 @@ let notes = {}; // { noteId: { id, title, body, tags, timeRef, charId, createdAt
 let charNotes = {}; // { charId: { memo, updatedAt } }
 let items = {}; // { itemId: { id, name, cat, owner, desc, memo, memoUpdatedAt, createdAt } }
 let editingItemId = null;
+let locationNotes = {}; // { locName: { memo, updatedAt } }
+let editingLocName = null;
 let editingCell = null;
 let isOffline = false;
 let activeTags = new Set();
@@ -2060,6 +2128,12 @@ function initFirebase(cfg) {
       if (document.getElementById('tab-items').classList.contains('active')) renderItems();
     });
 
+    // Listen for locationNotes
+    db.ref('locationNotes').on('value', snap => {
+      locationNotes = snap.val() || {};
+      if (document.getElementById('tab-loctimeline').classList.contains('active')) renderLocTimeline();
+    });
+
     isOffline = false;
     return true;
   } catch (e) {
@@ -2085,6 +2159,7 @@ function initOffline() {
       notes = parsed.notes || {};
       charNotes = parsed.charNotes || {};
       items = parsed.items || {};
+      locationNotes = parsed.locationNotes || {};
       if (parsed.rooms) rooms = normalizeRooms(parsed.rooms);
     } catch(e) {}
   }
@@ -3192,8 +3267,39 @@ function renderLocTimeline() {
 
     const nameTd = document.createElement('td');
     nameTd.className = 'col-name loc-name-cell';
-    nameTd.textContent = locName;
     nameTd.title = locName;
+
+    const nameInner = document.createElement('div');
+    nameInner.className = 'loc-name-inner';
+
+    const nameTop = document.createElement('div');
+    nameTop.className = 'loc-name-top';
+    const nameText = document.createElement('span');
+    nameText.className = 'loc-name-text';
+    nameText.textContent = locName;
+    nameTop.appendChild(nameText);
+
+    if (!isUnassigned) {
+      const memoBtn = document.createElement('button');
+      memoBtn.className = 'loc-memo-btn';
+      memoBtn.title = '場所メモを編集';
+      memoBtn.textContent = '📝';
+      memoBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        openLocNoteModal(locName);
+      });
+      nameTop.appendChild(memoBtn);
+    }
+    nameInner.appendChild(nameTop);
+
+    const locNote = locationNotes[locName];
+    if (locNote && locNote.memo) {
+      const preview = document.createElement('div');
+      preview.className = 'loc-name-preview';
+      preview.textContent = locNote.memo.split('\n')[0];
+      nameInner.appendChild(preview);
+    }
+    nameTd.appendChild(nameInner);
     tr.appendChild(nameTd);
 
     TIME_SLOTS.forEach(slot => {
@@ -3220,6 +3326,43 @@ function renderLocTimeline() {
 
   wrap.innerHTML = '';
   wrap.appendChild(table);
+}
+
+// ═══════════════════════════════════════════════════
+// LOCATION NOTE MODAL
+// ═══════════════════════════════════════════════════
+
+function openLocNoteModal(locName) {
+  editingLocName = locName;
+  document.getElementById('locnote-modal-title').textContent = '📍 ' + locName;
+  const note = locationNotes[locName] || {};
+  document.getElementById('locnote-memo').value = note.memo || '';
+  document.getElementById('locnote-modal').classList.add('open');
+  setTimeout(() => document.getElementById('locnote-memo').focus(), 50);
+}
+
+function saveLocNote() {
+  if (!editingLocName) return;
+  const memo = document.getElementById('locnote-memo').value.trim();
+  if (memo) {
+    locationNotes[editingLocName] = { memo, updatedAt: Date.now() };
+  } else {
+    delete locationNotes[editingLocName];
+  }
+  if (!isOffline && db) {
+    if (memo) {
+      db.ref('locationNotes/' + encodeURIComponent(editingLocName)).set(locationNotes[editingLocName]);
+    } else {
+      db.ref('locationNotes/' + encodeURIComponent(editingLocName)).remove();
+    }
+  } else {
+    const saved = sessionStorage.getItem('wex_timeline');
+    const parsed = saved ? JSON.parse(saved) : {};
+    parsed.locationNotes = locationNotes;
+    sessionStorage.setItem('wex_timeline', JSON.stringify(parsed));
+  }
+  closeModal('locnote-modal');
+  renderLocTimeline();
 }
 
 // ═══════════════════════════════════════════════════
