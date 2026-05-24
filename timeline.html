@@ -4162,16 +4162,15 @@ function escHtml(str) {
 // DRAG SCROLL (timeline-wrap)
 // ═══════════════════════════════════════════════════
 
-(function initDragScroll(wrap) {
+function initDragScroll(wrap) {
   if (!wrap) return;
 
   let isDown = false;
   let startX, startY, scrollLeft, scrollTop;
   let moved = false;
-  const THRESHOLD = 5; // px動いたらドラッグ判定
+  const THRESHOLD = 5;
 
   wrap.addEventListener('mousedown', function(e) {
-    // ボタン・入力要素はドラッグ対象外
     if (e.target.closest('button, input, select, textarea, a')) return;
     if (e.button !== 0) return;
     isDown = true;
@@ -4197,14 +4196,12 @@ function escHtml(str) {
     if (!isDown) return;
     isDown = false;
     wrap.classList.remove('dragging');
-    // ドラッグ判定されたらクリックイベントをキャンセル
     if (moved) {
       e.stopPropagation();
       moved = false;
     }
   });
 
-  // タッチ対応
   let touchStartX, touchStartY, touchScrollLeft, touchScrollTop;
   wrap.addEventListener('touchstart', function(e) {
     if (e.touches.length !== 1) return;
@@ -4221,9 +4218,10 @@ function escHtml(str) {
     wrap.scrollLeft = touchScrollLeft - dx;
     wrap.scrollTop  = touchScrollTop  - dy;
   }, { passive: true });
-  initDragScroll(document.getElementById('timeline-wrap'));
-  initDragScroll(document.getElementById('loctimeline-wrap'));
-})();
+}
+
+initDragScroll(document.getElementById('timeline-wrap'));
+initDragScroll(document.getElementById('loctimeline-wrap'));
 
 // ═══════════════════════════════════════════════════
 // STARTUP
