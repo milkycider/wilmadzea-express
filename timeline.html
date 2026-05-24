@@ -467,16 +467,7 @@
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    .cell-badge-info {
-      font-size: 9px;
-      font-weight: 700;
-      color: var(--teal);
-      background: rgba(60,166,150,0.12);
-      border: 1px solid rgba(60,166,150,0.4);
-      border-radius: 3px;
-      padding: 0px 4px;
-      line-height: 1.6;
-    }
+
 
     /* ── Resources tab ── */
     #resources-panel {
@@ -1368,7 +1359,6 @@
     <span class="toolbar-label">|</span>
     <span class="toolbar-label">凡例：</span>
     <span class="toolbar-label"><span style="color:var(--accent)">📍</span> 場所</span>
-    <span class="toolbar-label"><span class="cell-badge-info" style="vertical-align:middle;">情報あり</span></span>
     <span class="toolbar-label"><span class="cell-badge-explored" style="vertical-align:middle;">✓ 探索済</span></span>
     <span class="ml-auto toolbar-label text-muted" id="table-hint">セルをクリックして編集</span>
   </div>
@@ -2561,7 +2551,6 @@ function updateCellDisplay(el, data) {
   if (data.timeDetail) html += `<span class="cell-time-detail">${escHtml(data.timeDetail)}</span>`;
   if (data.location)   html += `<div class="cell-location">📍 ${escHtml(data.location)}</div>`;
   if (data.action)     html += `<div class="cell-action">${escHtml(data.action)}</div>`;
-  if (data.info)     badges += '<span class="cell-badge-info">情報あり</span>';
   if (badges) html += '<div class="cell-badges">' + badges + '</div>';
   el.innerHTML = html;
 }
