@@ -1018,6 +1018,8 @@
     }
     .loc-char-chip:hover { background: var(--bg4); }
     .loc-char-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    /* カード非表示モード */
+    #loctimeline-wrap.hide-chips .loc-char-chip { display: none; }
     .loc-row-unassigned .loc-name-cell { color: var(--text3); font-style: italic; font-weight: normal; }
 
     /* Location chip modal body */
@@ -1447,7 +1449,11 @@
 <div id="tab-loctimeline" class="tab-panel">
   <div id="loctimeline-toolbar">
     <span style="font-size:11px;color:var(--text2);">キャラクタータイムラインの「場所」欄を場所ごとに集計した逆引きビューです。チップをクリックすると元のセルにジャンプします。</span>
+    <div id="loctimeline-loop-filter-bar" style="display:none;align-items:center;gap:4px;"></div>
     <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);cursor:pointer;margin-left:auto;">
+      <input type="checkbox" id="loctimeline-hide-chips" onchange="toggleLocHideChips(this)"> カード非表示
+    </label>
+    <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);cursor:pointer;">
       <input type="checkbox" id="loctimeline-hide-empty" onchange="renderLocTimeline()"> 空行を非表示
     </label>
     <button class="toolbar-btn" onclick="renderLocTimeline()">🔄 更新</button>
@@ -2685,10 +2691,7 @@ function migrateTimelineToMultiLoop() {
 }
 
 function renderLoopFilter() {
-  const bar = document.getElementById('loop-filter-bar');
-  if (!bar) return;
-
-  // Gather all loop values from timelineData (new bundle format)
+  // Gather all loop values from timelineData (bundle format)
   const loopVals = new Set();
   Object.values(timelineData).forEach(slots => {
     if (!slots || typeof slots !== 'object') return;
@@ -2704,31 +2707,49 @@ function renderLoopFilter() {
     });
   });
 
-  if (loopVals.size === 0) {
-    bar.style.display = 'none';
-    // Separator before the bar also hide
-    bar.previousElementSibling && (bar.previousElementSibling.style.display = 'none');
-    activeLoopFilter = null;
-    return;
+  const sorted = [...loopVals].sort((a, b) => Number(a) - Number(b));
+
+  function buildHTML() {
+    let h = '<span class="toolbar-label" style="margin-right:2px;">ループ：</span>';
+    h += `<button class="loop-filter-btn${activeLoopFilter === null ? ' active' : ''}" onclick="setLoopFilter(null)">全部</button>`;
+    sorted.forEach(v => {
+      const esc = v.replace(/'/g, "\\'");
+      h += `<button class="loop-filter-btn${activeLoopFilter === v ? ' active' : ''}" onclick="setLoopFilter('${esc}')">L${escHtml(v)}</button>`;
+    });
+    return h;
   }
 
-  // Show separator and bar
-  bar.style.display = 'flex';
-  bar.previousElementSibling && (bar.previousElementSibling.style.display = '');
+  // ─ キャラクタータイムライン用バー ─
+  const bar = document.getElementById('loop-filter-bar');
+  if (bar) {
+    if (loopVals.size === 0) {
+      bar.style.display = 'none';
+      bar.previousElementSibling && (bar.previousElementSibling.style.display = 'none');
+      activeLoopFilter = null;
+    } else {
+      bar.style.display = 'flex';
+      bar.previousElementSibling && (bar.previousElementSibling.style.display = '');
+      bar.innerHTML = buildHTML();
+    }
+  }
 
-  const sorted = [...loopVals].sort((a, b) => Number(a) - Number(b));
-  let html = '<span class="toolbar-label" style="margin-right:2px;">ループ：</span>';
-  html += `<button class="loop-filter-btn${activeLoopFilter === null ? ' active' : ''}" onclick="setLoopFilter(null)">全部</button>`;
-  sorted.forEach(v => {
-    const esc = v.replace(/'/g, "\\'");
-    html += `<button class="loop-filter-btn${activeLoopFilter === v ? ' active' : ''}" onclick="setLoopFilter('${esc}')">L${escHtml(v)}</button>`;
-  });
-  bar.innerHTML = html;
+  // ─ 場所タイムライン用バー ─
+  const locBar = document.getElementById('loctimeline-loop-filter-bar');
+  if (locBar) {
+    if (loopVals.size === 0) {
+      locBar.style.display = 'none';
+    } else {
+      locBar.style.display = 'flex';
+      locBar.innerHTML = buildHTML();
+    }
+  }
 }
 
 function setLoopFilter(val) {
   activeLoopFilter = val;
-  renderCells();
+  renderCells(); // キャラタイムライン更新 + 両バーのボタン状態更新
+  const locTab = document.getElementById('tab-loctimeline');
+  if (locTab && locTab.classList.contains('active')) renderLocTimeline();
 }
 
 function renderCells() {
@@ -3728,10 +3749,17 @@ document.addEventListener('keydown', e => {
 // LOCATION TIMELINE
 // ═══════════════════════════════════════════════════
 
+function toggleLocHideChips(cb) {
+  const wrap = document.getElementById('loctimeline-wrap');
+  if (wrap) wrap.classList.toggle('hide-chips', cb.checked);
+}
+
 function renderLocTimeline() {
   const wrap = document.getElementById('loctimeline-wrap');
   if (!wrap) return;
 
+  // カード非表示状態を再描画後も引き継ぐ
+  const hideChips = document.getElementById('loctimeline-hide-chips')?.checked;
   const hideEmpty = document.getElementById('loctimeline-hide-empty').checked;
 
   // キャラID→{name,color} マップを構築
@@ -3874,6 +3902,9 @@ function renderLocTimeline() {
 
   wrap.innerHTML = '';
   wrap.appendChild(table);
+  // カード非表示状態を再描画後も反映
+  if (hideChips) wrap.classList.add('hide-chips');
+  else wrap.classList.remove('hide-chips');
 }
 
 // ═══════════════════════════════════════════════════
