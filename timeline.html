@@ -2339,7 +2339,14 @@ function initFirebase(cfg) {
 
     // Listen for locationNotes
     db.ref('locationNotes').on('value', snap => {
-      locationNotes = snap.val() || {};
+      const raw = snap.val() || {};
+      // 旧データが encodeURIComponent されている場合はデコードして正規化
+      locationNotes = {};
+      Object.entries(raw).forEach(([k, v]) => {
+        let decoded = k;
+        try { decoded = decodeURIComponent(k); } catch {}
+        locationNotes[decoded] = v;
+      });
       if (document.getElementById('tab-loctimeline').classList.contains('active')) renderLocTimeline();
     });
 
@@ -3926,7 +3933,8 @@ function openLocNoteModal(locName, slotKey, slotLabel) {
 function saveLocNote() {
   if (!editingLocName || !editingLocSlot) return;
   const memo = document.getElementById('locnote-memo').value.trim();
-  const key = encodeURIComponent(editingLocName);
+  // Firebase キーに使えない文字だけ置換（日本語はそのままOK）
+  const safeKey = editingLocName.replace(/[.$#[\]/]/g, '_');
   if (!locationNotes[editingLocName]) locationNotes[editingLocName] = {};
   if (memo) {
     locationNotes[editingLocName][editingLocSlot] = { memo, updatedAt: Date.now() };
@@ -3936,7 +3944,7 @@ function saveLocNote() {
       delete locationNotes[editingLocName];
   }
   if (!isOffline && db) {
-    const path = 'locationNotes/' + key + '/' + editingLocSlot;
+    const path = 'locationNotes/' + safeKey + '/' + editingLocSlot;
     if (memo) {
       db.ref(path).set({ memo, updatedAt: Date.now() });
     } else {
