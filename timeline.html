@@ -1630,6 +1630,46 @@
 </div>
 
 <!-- ═══ Note Edit Modal ═══ -->
+<!-- ═══ ITEM MODAL ═══ -->
+<div class="modal-overlay" id="item-modal">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-header">
+      <h2 id="item-modal-title">＋ アイテムを追加</h2>
+      <button class="modal-close" onclick="closeModal('item-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>アイテム名 <span style="color:var(--red)">*</span></label>
+        <input type="text" id="item-name-input" placeholder="例: 銀の懐中時計">
+      </div>
+      <div class="form-group">
+        <label>カテゴリ</label>
+        <select id="item-cat-input">
+          <option value="clue">手がかり</option>
+          <option value="doc">書類・メモ</option>
+          <option value="key">鍵・アクセス</option>
+          <option value="weapon">武器</option>
+          <option value="tool">道具</option>
+          <option value="other">その他</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>所持者 / 発見場所</label>
+        <input type="text" id="item-owner-input" placeholder="例: ワイロエル・ロイヤル / 1B号室">
+      </div>
+      <div class="form-group">
+        <label>説明・特徴</label>
+        <textarea id="item-desc-input" rows="3" placeholder="外見・用途・入手経緯など…" style="resize:vertical;"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="toolbar-btn" id="item-delete-btn" style="color:var(--red);border-color:var(--red);display:none;" onclick="deleteItem()">削除</button>
+      <button class="toolbar-btn" onclick="closeModal('item-modal')">キャンセル</button>
+      <button class="toolbar-btn primary" onclick="saveItem()">保存</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="note-modal">
   <div class="modal-box" style="max-width:580px;">
     <div class="modal-header">
@@ -3886,45 +3926,6 @@ function escHtml(str) {
   }
 })();
 </script>
+
 </body>
-</html><!-- ═══ ITEM MODAL ═══ -->
-<div class="modal" id="item-modal">
-  <div class="modal-box">
-    <div class="modal-header">
-      <h2 id="item-modal-title">＋ アイテムを追加</h2>
-      <button class="modal-close" onclick="closeModal('item-modal')">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label>アイテム名 <span style="color:var(--red)">*</span></label>
-        <input type="text" id="item-name-input" placeholder="例: 銀の懐中時計">
-      </div>
-      <div class="form-group">
-        <label>カテゴリ</label>
-        <select id="item-cat-input">
-          <option value="clue">手がかり</option>
-          <option value="doc">書類・メモ</option>
-          <option value="key">鍵・アクセス</option>
-          <option value="weapon">武器</option>
-          <option value="tool">道具</option>
-          <option value="other">その他</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>所持者 / 発見場所</label>
-        <input type="text" id="item-owner-input" placeholder="例: ワイロエル・ロイヤル / 1B号室">
-      </div>
-      <div class="form-group">
-        <label>説明・特徴</label>
-        <textarea id="item-desc-input" rows="3" placeholder="外見・用途・入手経緯など…" style="resize:vertical;"></textarea>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="toolbar-btn" id="item-delete-btn" style="color:var(--red);border-color:var(--red);display:none;" onclick="deleteItem()">削除</button>
-      <button class="toolbar-btn" onclick="closeModal('item-modal')">キャンセル</button>
-      <button class="toolbar-btn primary" onclick="saveItem()">保存</button>
-    </div>
-  </div>
-</div>
-
-
+</html>
