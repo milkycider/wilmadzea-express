@@ -166,6 +166,31 @@
       font-size: 11px;
       color: var(--text2);
     }
+    #loop-filter-bar {
+      display: none;
+      align-items: center;
+      gap: 4px;
+    }
+    .loop-filter-btn {
+      padding: 3px 10px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .loop-filter-btn:hover { background: var(--bg4); border-color: var(--accent2); color: var(--text); }
+    .loop-filter-btn.active {
+      background: rgba(200,146,42,0.18);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .timeline-cell.cell-loop-hidden { background: none !important; border-bottom-color: transparent !important; }
+    .timeline-cell.cell-loop-hidden .cell-inner { opacity: 0.07; pointer-events: none; }
 
     /* ── Timeline grid ── */
     #timeline-wrap {
@@ -1363,6 +1388,8 @@
     <span class="toolbar-label"><span style="color:var(--accent)">📍</span> 場所</span>
     <span class="toolbar-label" style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:18px;height:3px;background:rgba(39,174,96,0.7);border-radius:2px;vertical-align:middle;"></span> 探索済み</span>
     <span class="toolbar-label"><span class="cell-badge-loop" style="vertical-align:middle;">L1</span> ループ数</span>
+    <span class="toolbar-label">|</span>
+    <div id="loop-filter-bar"></div>
     <span class="ml-auto toolbar-label text-muted" id="table-hint">セルをクリックして編集</span>
   </div>
   <div id="timeline-wrap">
@@ -2072,6 +2099,7 @@ let editingItemId = null;
 let locationNotes = {}; // { locName: { memo, updatedAt } }
 let editingLocName = null;
 let editingLocSlot = null;
+let activeLoopFilter = null; // null=全部, string='1'/'2'/etc.
 let editingCell = null;
 let isOffline = false;
 let activeTags = new Set();
@@ -2560,13 +2588,53 @@ function renderTimelineBody() {
   });
 }
 
+function renderLoopFilter() {
+  const bar = document.getElementById('loop-filter-bar');
+  if (!bar) return;
+
+  // Gather all loop values from timelineData
+  const loopVals = new Set();
+  Object.values(timelineData).forEach(slots => {
+    if (!slots || typeof slots !== 'object') return;
+    Object.values(slots).forEach(d => {
+      if (d && d.loop) loopVals.add(String(d.loop));
+    });
+  });
+
+  if (loopVals.size === 0) {
+    bar.style.display = 'none';
+    // Separator before the bar also hide
+    bar.previousElementSibling && (bar.previousElementSibling.style.display = 'none');
+    activeLoopFilter = null;
+    return;
+  }
+
+  // Show separator and bar
+  bar.style.display = 'flex';
+  bar.previousElementSibling && (bar.previousElementSibling.style.display = '');
+
+  const sorted = [...loopVals].sort((a, b) => Number(a) - Number(b));
+  let html = '<span class="toolbar-label" style="margin-right:2px;">ループ：</span>';
+  html += `<button class="loop-filter-btn${activeLoopFilter === null ? ' active' : ''}" onclick="setLoopFilter(null)">全部</button>`;
+  sorted.forEach(v => {
+    const esc = v.replace(/'/g, "\\'");
+    html += `<button class="loop-filter-btn${activeLoopFilter === v ? ' active' : ''}" onclick="setLoopFilter('${esc}')">L${escHtml(v)}</button>`;
+  });
+  bar.innerHTML = html;
+}
+
+function setLoopFilter(val) {
+  activeLoopFilter = val;
+  renderCells();
+}
+
 function renderCells() {
   // Clear all cells first
   document.querySelectorAll('.timeline-cell').forEach(td => {
     const el = document.getElementById(`cell-${td.dataset.charId}-${td.dataset.slotKey}`);
     if (el) {
       el.innerHTML = '';
-      td.classList.remove('has-data', 'is-explored', 'cell-st-alive', 'cell-st-dead', 'cell-st-missing', 'cell-st-unconscious', 'cell-st-suspicious');
+      td.classList.remove('has-data', 'is-explored', 'cell-loop-hidden', 'cell-st-alive', 'cell-st-dead', 'cell-st-missing', 'cell-st-unconscious', 'cell-st-suspicious');
     }
   });
 
@@ -2579,8 +2647,8 @@ function renderCells() {
     });
   });
 
-  // Update character status badges from timeline if no char-level status set
-  // (optional: the char-level status is already shown; this is just for rendering)
+  // Refresh loop filter buttons to reflect current data
+  renderLoopFilter();
 }
 
 function updateCellDisplay(el, data) {
@@ -2592,12 +2660,20 @@ function updateCellDisplay(el, data) {
     return;
   }
 
+  // Loop layer filter: hide cells whose loop doesn't match the active filter
+  // (cells with no loop set always show)
+  const loopFiltered = activeLoopFilter !== null && data.loop && String(data.loop) !== String(activeLoopFilter);
   if (td) {
     td.classList.add('has-data');
     td.classList.remove(...ST_CLASSES);
-    if (data.status) td.classList.add('cell-st-' + data.status);
-    if (data.explored) td.classList.add('is-explored');
-    else td.classList.remove('is-explored');
+    if (loopFiltered) {
+      td.classList.add('cell-loop-hidden');
+    } else {
+      td.classList.remove('cell-loop-hidden');
+      if (data.status) td.classList.add('cell-st-' + data.status);
+      if (data.explored) td.classList.add('is-explored');
+      else td.classList.remove('is-explored');
+    }
   }
   let html = '';
   let badges = '';
