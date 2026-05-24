@@ -1254,6 +1254,27 @@
     .item-save-btn.dirty { opacity: 1; pointer-events: auto; }
     .item-save-btn:hover { filter: brightness(1.15); }
     .item-saved-at { font-size: 10px; color: var(--text3); }
+    .item-acquired-row {
+      display: flex; align-items: center; gap: 5px;
+      padding: 6px 12px 7px; flex-wrap: wrap;
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .item-acq-label { font-size: 10px; color: var(--text3); flex-shrink: 0; margin-right: 2px; }
+    .item-loop-toggle {
+      font-size: 10px; font-weight: 600;
+      padding: 2px 9px; border-radius: 20px;
+      border: 1px solid var(--border);
+      background: none; cursor: pointer;
+      color: var(--text3); transition: all 0.12s;
+      line-height: 1.6;
+    }
+    .item-loop-toggle.acquired {
+      background: rgba(99,102,241,0.18);
+      border-color: rgba(99,102,241,0.6);
+      color: #a5b4fc;
+    }
+    .item-loop-toggle:hover { filter: brightness(1.25); }
 
     /* item modal */
     #item-modal .modal-box { max-width: 460px; }
@@ -2843,6 +2864,19 @@ function migrateTimelineToMultiLoop() {
   }
 }
 
+function getLoopKeys() {
+  const loopVals = new Set();
+  Object.values(timelineData).forEach(function(slots) {
+    if (!slots || typeof slots !== 'object') return;
+    Object.values(slots).forEach(function(bundle) {
+      if (!bundle || typeof bundle !== 'object') return;
+      if (isOldSlotFormat(bundle)) { if (bundle.loop) loopVals.add(String(bundle.loop)); return; }
+      Object.keys(bundle).forEach(function(lk) { if (lk !== '_' && hasEntryContent(bundle[lk])) loopVals.add(lk); });
+    });
+  });
+  return [...loopVals].sort(function(a, b) { return Number(a) - Number(b); });
+}
+
 function renderLoopFilter() {
   // Gather all loop values from timelineData (bundle format)
   const loopVals = new Set();
@@ -4142,19 +4176,20 @@ function renderLocTimeline() {
   // ─ 本体 ─
   const tbody = document.createElement('tbody');
 
-  // 位置管理モード：「不明の場所」行（未アサインキャラ）を先頭に追加
+  // キャラクタータイムライン順のリストを構築（pos モード用・セル描画でも共有）
+  const allCharList = [];
+  rooms.forEach(room => { if (!room.isEvent) room.chars.forEach(ch => allCharList.push(ch)); });
+
+  // 位置管理モード：「不明の場所」行を末尾に追加するため生成だけ先にやっておく
+  let unknownTr = null;
   if (locViewMode === 'pos') {
-    const unknownTr = document.createElement('tr');
+    unknownTr = document.createElement('tr');
     unknownTr.className = 'loc-row loc-unknown-row';
 
     const unknownTh = document.createElement('td');
     unknownTh.className = 'col-name loc-name-cell';
     unknownTh.innerHTML = '<div class="loc-name-inner"><div class="loc-name-top"><span class="loc-name-text">❓ 不明の場所</span></div></div>';
     unknownTr.appendChild(unknownTh);
-
-    // 全キャラIDを収集
-    const allCharList = [];
-    rooms.forEach(room => { if (!room.isEvent) room.chars.forEach(ch => allCharList.push(ch)); });
 
     TIME_SLOTS.forEach(slot => {
       const td = document.createElement('td');
@@ -4171,7 +4206,7 @@ function renderLocTimeline() {
       });
       unknownTr.appendChild(td);
     });
-    tbody.appendChild(unknownTr);
+    // ここでは append しない（末尾固定のため後回し）
   }
 
   locEntries.forEach(([locName, slotMap]) => {
@@ -4202,19 +4237,17 @@ function renderLocTimeline() {
       td.className = 'loc-cell' + (slot.hour === 0 && slot.day > 0 ? ' day-change' : '');
 
       if (locViewMode === 'pos' && !isUnassigned) {
-        // ── 位置管理モード：手動アサインタグを表示 ──
+        // ── 位置管理モード：手動アサインタグをキャラクタータイムライン順で表示 ──
         const slotPos = positionData[slot.key] || {};
-        Object.entries(slotPos).forEach(([charId, cLocName]) => {
-          if (cLocName !== locName) return;
-          const chInfo = allChars[charId];
-          if (!chInfo) return;
+        allCharList.forEach(ch => {
+          if (slotPos[ch.id] !== locName) return;
           const tag = document.createElement('span');
           tag.className = 'loc-pos-tag';
-          const shortName = chInfo.name.length > 9 ? chInfo.name.slice(0, 8) + '…' : chInfo.name;
-          tag.innerHTML = `<span class="loc-pos-tag-dot" style="background:${escHtml(chInfo.color||'#888')}"></span>${escHtml(shortName)}<span class="loc-pos-tag-remove" title="外す">×</span>`;
+          const shortName = ch.name.length > 9 ? ch.name.slice(0, 8) + '…' : ch.name;
+          tag.innerHTML = `<span class="loc-pos-tag-dot" style="background:${escHtml(ch.color||'#888')}"></span>${escHtml(shortName)}<span class="loc-pos-tag-remove" title="外す">×</span>`;
           tag.querySelector('.loc-pos-tag-remove').onclick = (e) => {
             e.stopPropagation();
-            removeCharFromPos(charId, slot.key);
+            removeCharFromPos(ch.id, slot.key);
           };
           td.appendChild(tag);
         });
@@ -4260,6 +4293,10 @@ function renderLocTimeline() {
     });
     tbody.appendChild(tr);
   });
+
+  // 位置管理モード：「不明の場所」行を一番下に固定
+  if (unknownTr) tbody.appendChild(unknownTr);
+
   table.appendChild(tbody);
 
   wrap.innerHTML = '';
@@ -4449,6 +4486,21 @@ function saveItemMemo(itemId, memo, btnEl, savedAtEl) {
   }
 }
 
+function toggleItemAcquired(itemId, loopKey) {
+  if (!items[itemId]) return;
+  if (!items[itemId].acquired) items[itemId].acquired = {};
+  items[itemId].acquired[loopKey] = !items[itemId].acquired[loopKey];
+  if (!isOffline && db) {
+    db.ref('items/' + itemId + '/acquired').set(items[itemId].acquired);
+  } else {
+    const saved = sessionStorage.getItem('wex_timeline');
+    const parsed = saved ? JSON.parse(saved) : {};
+    parsed.items = items;
+    sessionStorage.setItem('wex_timeline', JSON.stringify(parsed));
+  }
+  renderItems();
+}
+
 function deleteItem() {
   if (!editingItemId) return;
   if (!confirm('このアイテムを削除しますか？')) return;
@@ -4520,6 +4572,36 @@ function renderItems() {
     header.appendChild(editBtn);
 
     card.appendChild(header);
+
+    // ── acquired row ──
+    const loops = getLoopKeys();
+    const acquired = item.acquired || {};
+    const acqRow = document.createElement('div');
+    acqRow.className = 'item-acquired-row';
+
+    const acqLabel = document.createElement('span');
+    acqLabel.className = 'item-acq-label';
+    acqLabel.textContent = '所持：';
+    acqRow.appendChild(acqLabel);
+
+    if (loops.length === 0) {
+      const btn = document.createElement('button');
+      btn.className = 'item-loop-toggle' + (acquired['_'] ? ' acquired' : '');
+      btn.textContent = '所持中';
+      btn.title = acquired['_'] ? '所持中（クリックで解除）' : '未所持（クリックでセット）';
+      btn.addEventListener('click', function() { toggleItemAcquired(item.id, '_'); });
+      acqRow.appendChild(btn);
+    } else {
+      loops.forEach(function(lk) {
+        const btn = document.createElement('button');
+        btn.className = 'item-loop-toggle' + (acquired[lk] ? ' acquired' : '');
+        btn.textContent = 'L' + lk;
+        btn.title = (acquired[lk] ? 'L' + lk + '：所持中' : 'L' + lk + '：未所持') + '（クリックで切替）';
+        btn.addEventListener('click', function() { toggleItemAcquired(item.id, lk); });
+        acqRow.appendChild(btn);
+      });
+    }
+    card.appendChild(acqRow);
 
     // ── body ──
     const cardBody = document.createElement('div');
