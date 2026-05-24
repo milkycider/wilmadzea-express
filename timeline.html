@@ -3444,8 +3444,12 @@ function renderLocTimeline() {
   // locationListの場所をあらかじめ登録（データがなくても行を出す）
   locationList.forEach(loc => { if (loc) locIndex[loc] = {}; });
 
-  // timelineDataから逆引き構築
-  Object.entries(timelineData).forEach(([charId, slots]) => {
+  // timelineDataから逆引き構築（キャラクタータイムラインと同じ順番で処理）
+  const orderedCharIds = [];
+  rooms.forEach(room => room.chars.forEach(ch => orderedCharIds.push(ch.id)));
+
+  orderedCharIds.forEach(charId => {
+    const slots = timelineData[charId];
     if (!slots || typeof slots !== 'object') return;
     const chInfo = allChars[charId];
     if (!chInfo) return;
