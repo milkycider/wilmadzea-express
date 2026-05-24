@@ -477,6 +477,8 @@
       cursor: pointer;
       border-radius: 2px;
       transition: background 0.1s;
+      flex: 1;
+      min-height: 0;
     }
     .cell-entry:hover { background: rgba(255,255,255,0.04); }
     .cell-entry-divider {
@@ -515,6 +517,8 @@
       overflow: hidden;
       height: 100%;
       position: relative;
+      display: flex;
+      flex-direction: column;
     }
     .cell-location {
       font-size: 10px;
