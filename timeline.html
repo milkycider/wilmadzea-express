@@ -288,12 +288,14 @@
       justify-content: center;
       height: 100%;
       gap: 2px;
+      position: relative; /* char-controls の絶対配置の基準（フルセル高さが確実） */
+      overflow: visible;
     }
     .name-cell-top {
       display: flex;
       align-items: center;
       gap: 5px;
-      position: relative; /* char-controls の絶対配置の基準 */
+      /* position: relative は .name-cell に移動したのでここでは不要 */
     }
     .char-dot {
       width: 8px; height: 8px;
@@ -316,24 +318,30 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    /* Controls shown on hover — absolutely positioned so they don't squish the name */
+    /* Controls shown on hover
+       .name-cell (position:relative, height:100%) を基準に絶対配置
+       → flex の外に出るのでname-textを圧迫しない */
     .char-controls {
       position: absolute;
-      right: 2px;
+      right: 4px;
       top: 50%;
       transform: translateY(-50%);
       display: flex;
       align-items: center;
       gap: 1px;
       opacity: 0;
+      pointer-events: none;
       transition: opacity 0.15s;
-      background: var(--bg2); /* 下のテキストを隠す */
+      background: var(--bg2);
       border-radius: 4px;
-      padding: 0 2px;
+      padding: 1px 3px;
+      z-index: 5;
     }
-    .col-name:hover .char-controls { opacity: 1; }
-    /* event-row の char-controls は背景色を合わせる */
-    .char-row.event-row .col-name:hover .char-controls { background: #1c1710; }
+    .col-name:hover .char-controls {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .char-row.event-row .col-name .char-controls { background: #1c1710; }
     .char-ctrl-btn {
       background: none;
       border: none;
@@ -1920,29 +1928,34 @@ function renderTimelineBody() {
           <div class="name-cell-top">
             <span style="font-size:14px;flex-shrink:0;">📅</span>
             <span class="char-name-text" style="color:var(--accent);">${escHtml(char.name)}</span>
-            <div class="char-controls">
-              <button class="char-ctrl-btn" title="上へ" onclick="event.stopPropagation();moveChar('${escHtml(room.id)}',${ci},-1)">▲</button>
-              <button class="char-ctrl-btn" title="下へ" onclick="event.stopPropagation();moveChar('${escHtml(room.id)}',${ci},1)">▼</button>
-              <button class="char-ctrl-btn" title="編集" onclick="event.stopPropagation();openEditCharModal('${escHtml(room.id)}','${escHtml(char.id)}')">✏</button>
-            </div>
+          </div>
+          <div class="char-controls">
+            <button class="char-ctrl-btn" title="上へ" onclick="event.stopPropagation();moveChar('${escHtml(room.id)}',${ci},-1)">▲</button>
+            <button class="char-ctrl-btn" title="下へ" onclick="event.stopPropagation();moveChar('${escHtml(room.id)}',${ci},1)">▼</button>
+            <button class="char-ctrl-btn" title="編集" onclick="event.stopPropagation();openEditCharModal('${escHtml(room.id)}','${escHtml(char.id)}')">✏</button>
           </div>
         </div>`;
       } else {
+        // ステータスバッジは2行目に配置（1行目の名前スペースを確保）
         const statusBadge = char.status
           ? `<span class="status-badge status-${char.status}">${STATUS_LABELS[char.status] || char.status}</span>`
           : '';
+        const roleLine = [
+          statusBadge,
+          escHtml(char.role || ''),
+          char.note ? '· ' + escHtml(char.note) : ''
+        ].filter(Boolean).join(' ');
         nameTd.innerHTML = `<div class="name-cell">
           <div class="name-cell-top">
             <span class="char-dot" style="background:${escHtml(char.color)}"></span>
             <span class="char-name-text">${escHtml(char.name)}</span>
-            ${statusBadge}
-            <div class="char-controls">
-              <button class="char-ctrl-btn" title="上へ" onclick="event.stopPropagation();moveChar('${escHtml(room.id)}',${ci},-1)">▲</button>
-              <button class="char-ctrl-btn" title="下へ" onclick="event.stopPropagation();moveChar('${escHtml(room.id)}',${ci},1)">▼</button>
-              <button class="char-ctrl-btn" title="編集" onclick="event.stopPropagation();openEditCharModal('${escHtml(room.id)}','${escHtml(char.id)}')">✏</button>
-            </div>
           </div>
-          <div class="char-role">${escHtml(char.role || '')}${char.note ? ' · ' + escHtml(char.note) : ''}</div>
+          <div class="char-role">${roleLine}</div>
+          <div class="char-controls">
+            <button class="char-ctrl-btn" title="上へ" onclick="event.stopPropagation();moveChar('${escHtml(room.id)}',${ci},-1)">▲</button>
+            <button class="char-ctrl-btn" title="下へ" onclick="event.stopPropagation();moveChar('${escHtml(room.id)}',${ci},1)">▼</button>
+            <button class="char-ctrl-btn" title="編集" onclick="event.stopPropagation();openEditCharModal('${escHtml(room.id)}','${escHtml(char.id)}')">✏</button>
+          </div>
         </div>`;
       }
       charRow.appendChild(nameTd);
@@ -3199,6 +3212,8 @@ function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ═══════════════════════════════════════════════════
+// STARTUP
 // ═══════════════════════════════════════════════════
 // STARTUP
 // ═══════════════════════════════════════════════════
