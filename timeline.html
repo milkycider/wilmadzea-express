@@ -189,8 +189,16 @@
       border-color: var(--accent);
       color: var(--accent);
     }
-    .timeline-cell.cell-loop-hidden { background: none !important; border-bottom-color: transparent !important; }
-    .timeline-cell.cell-loop-hidden .cell-inner { opacity: 0.07; pointer-events: none; }
+    .timeline-cell.cell-loop-hidden {
+      background: repeating-linear-gradient(
+        135deg,
+        transparent,
+        transparent 4px,
+        rgba(100,100,120,0.06) 4px,
+        rgba(100,100,120,0.06) 8px
+      ) !important;
+      border-bottom-color: transparent !important;
+    }
 
     /* ── Timeline grid ── */
     #timeline-wrap {
@@ -2660,20 +2668,25 @@ function updateCellDisplay(el, data) {
     return;
   }
 
-  // Loop layer filter: hide cells whose loop doesn't match the active filter
-  // (cells with no loop set always show)
+  // Loop layer filter: cells whose loop doesn't match active filter → clear content, dim cell
+  // (cells with no loop set always show normally)
   const loopFiltered = activeLoopFilter !== null && data.loop && String(data.loop) !== String(activeLoopFilter);
+  if (loopFiltered) {
+    el.innerHTML = '';
+    if (td) {
+      td.classList.remove('has-data', ...ST_CLASSES, 'is-explored');
+      td.classList.add('cell-loop-hidden');
+    }
+    return;
+  }
+
   if (td) {
+    td.classList.remove('cell-loop-hidden');
     td.classList.add('has-data');
     td.classList.remove(...ST_CLASSES);
-    if (loopFiltered) {
-      td.classList.add('cell-loop-hidden');
-    } else {
-      td.classList.remove('cell-loop-hidden');
-      if (data.status) td.classList.add('cell-st-' + data.status);
-      if (data.explored) td.classList.add('is-explored');
-      else td.classList.remove('is-explored');
-    }
+    if (data.status) td.classList.add('cell-st-' + data.status);
+    if (data.explored) td.classList.add('is-explored');
+    else td.classList.remove('is-explored');
   }
   let html = '';
   let badges = '';
