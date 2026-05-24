@@ -2312,8 +2312,11 @@ function openAddEventRowModal() {
   sel.appendChild(newOpt);
 
   // 初期状態でグループ名入力欄を非表示に
-  document.getElementById('new-room-name-group').style.display = 'none';
   document.getElementById('new-room-name-input').value = '';
+
+  // 現在のselectの値に合わせて入力欄の表示を同期（既存イベントグループがない場合など、
+  // __new_event__が最初から選択済みでonchangeが発火しないケースに対応）
+  onRoomSelectChange();
 
   document.getElementById('char-modal').classList.add('open');
   setTimeout(() => document.getElementById('new-char-name').focus(), 50);
@@ -3212,8 +3215,6 @@ function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ═══════════════════════════════════════════════════
-// STARTUP
 // ═══════════════════════════════════════════════════
 // STARTUP
 // ═══════════════════════════════════════════════════
