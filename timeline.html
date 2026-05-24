@@ -394,6 +394,38 @@
     .timeline-cell.day-change { border-left: 2px solid var(--accent2); }
     .timeline-cell.has-data { background: var(--bg3); }
     .timeline-cell.has-data:hover { background: var(--bg4); }
+    /* 探索済み・ループバッジ */
+    .cell-badges {
+      position: absolute;
+      top: 2px;
+      right: 3px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      z-index: 1;
+    }
+    .cell-badge-explored {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--green);
+      background: rgba(39,174,96,0.15);
+      border: 1px solid rgba(39,174,96,0.4);
+      border-radius: 3px;
+      padding: 0px 4px;
+      line-height: 1.6;
+    }
+    .cell-badge-loop {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--accent);
+      background: rgba(200,146,42,0.12);
+      border: 1px solid rgba(200,146,42,0.35);
+      border-radius: 3px;
+      padding: 0px 4px;
+      line-height: 1.6;
+    }
+    .timeline-cell.is-explored { border-bottom: 2px solid rgba(39,174,96,0.4); }
+
     /* セル内状態ライン */
     .timeline-cell.cell-st-alive    { border-top: 2px solid rgba(39,174,96,0.5);  }
     .timeline-cell.cell-st-dead     { border-top: 2px solid rgba(180,83,75,0.6);  background: rgba(180,83,75,0.05) !important; }
@@ -879,7 +911,38 @@
       max-width: var(--cell-w);
       padding: 3px;
       vertical-align: top;
+      position: relative;
+      cursor: pointer;
     }
+    .loc-cell:hover { background: var(--bg3); }
+    .loc-cell.has-note { background: rgba(200,146,42,0.06); }
+    .loc-cell.has-note:hover { background: rgba(200,146,42,0.12); }
+    .loc-cell-note {
+      font-size: 10px;
+      color: var(--text3);
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-all;
+      padding: 2px 3px;
+      border-top: 1px solid var(--accent2);
+      margin-top: 2px;
+    }
+    .loc-cell-add-note {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      font-size: 10px;
+      background: none;
+      border: none;
+      color: var(--text3);
+      cursor: pointer;
+      opacity: 0;
+      padding: 1px 3px;
+      border-radius: 3px;
+      transition: opacity 0.15s;
+    }
+    .loc-cell:hover .loc-cell-add-note { opacity: 1; }
+    .loc-cell-add-note:hover { color: var(--accent); background: var(--bg4); }
     .loc-char-chip {
       display: flex;
       align-items: center;
@@ -1558,6 +1621,29 @@
         <label>📝 メモ</label>
         <textarea id="cell-notes" placeholder="自由メモ、疑問点、PL間の共有事項など"></textarea>
       </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:0 0 auto;">
+          <label>✅ 探索済み</label>
+          <label style="display:flex;align-items:center;gap:8px;padding-top:6px;cursor:pointer;">
+            <input type="checkbox" id="cell-explored" style="width:16px;height:16px;accent-color:var(--green);">
+            <span style="font-size:12px;color:var(--text2);">探索済みにする</span>
+          </label>
+        </div>
+        <div class="form-group" style="flex:0 0 auto;">
+          <label>🔁 ループ数</label>
+          <select id="cell-loop" style="width:110px;">
+            <option value="">—</option>
+            <option value="1">ループ 1</option>
+            <option value="2">ループ 2</option>
+            <option value="3">ループ 3</option>
+            <option value="4">ループ 4</option>
+            <option value="5">ループ 5</option>
+            <option value="6">ループ 6</option>
+            <option value="7">ループ 7</option>
+            <option value="8">ループ 8</option>
+          </select>
+        </div>
+      </div>
       <div class="form-group">
         <label>🏷 タグ</label>
         <div class="tag-list" id="tag-list"></div>
@@ -1980,6 +2066,7 @@ let items = {}; // { itemId: { id, name, cat, owner, desc, memo, memoUpdatedAt, 
 let editingItemId = null;
 let locationNotes = {}; // { locName: { memo, updatedAt } }
 let editingLocName = null;
+let editingLocSlot = null;
 let editingCell = null;
 let isOffline = false;
 let activeTags = new Set();
@@ -2431,7 +2518,7 @@ function renderCells() {
     const el = document.getElementById(`cell-${td.dataset.charId}-${td.dataset.slotKey}`);
     if (el) {
       el.innerHTML = '';
-      td.classList.remove('has-data', 'cell-st-alive', 'cell-st-dead', 'cell-st-missing', 'cell-st-unconscious', 'cell-st-suspicious');
+      td.classList.remove('has-data', 'is-explored', 'cell-st-alive', 'cell-st-dead', 'cell-st-missing', 'cell-st-unconscious', 'cell-st-suspicious');
     }
   });
 
@@ -2451,7 +2538,7 @@ function renderCells() {
 function updateCellDisplay(el, data) {
   const td = el.closest('.timeline-cell');
   const ST_CLASSES = ['cell-st-alive','cell-st-dead','cell-st-missing','cell-st-unconscious','cell-st-suspicious'];
-  if (!data || (!data.location && !data.action && !data.info && !data.notes && !data.timeDetail && !data.status)) {
+  if (!data || (!data.location && !data.action && !data.info && !data.notes && !data.timeDetail && !data.status && !data.explored && !data.loop)) {
     el.innerHTML = '';
     if (td) { td.classList.remove('has-data'); td.classList.remove(...ST_CLASSES); }
     return;
@@ -2461,8 +2548,14 @@ function updateCellDisplay(el, data) {
     td.classList.add('has-data');
     td.classList.remove(...ST_CLASSES);
     if (data.status) td.classList.add('cell-st-' + data.status);
+    if (data.explored) td.classList.add('is-explored');
+    else td.classList.remove('is-explored');
   }
   let html = '';
+  let badges = '';
+  if (data.explored) badges += '<span class="cell-badge-explored">✓ 探索済</span>';
+  if (data.loop)     badges += '<span class="cell-badge-loop">L' + escHtml(data.loop) + '</span>';
+  if (badges) html += '<div class="cell-badges">' + badges + '</div>';
   if (data.timeDetail) html += `<span class="cell-time-detail">${escHtml(data.timeDetail)}</span>`;
   if (data.location)   html += `<div class="cell-location">📍 ${escHtml(data.location)}</div>`;
   if (data.action)     html += `<div class="cell-action">${escHtml(data.action)}</div>`;
@@ -2545,6 +2638,8 @@ function openCellModal(charId, charName, charColor, slotKey, slotLabel, slotDay,
   document.getElementById('cell-info').value        = data.info       || '';
   document.getElementById('cell-notes').value       = data.notes      || '';
   document.getElementById('cell-status').value      = data.status     || '';
+  document.getElementById('cell-explored').checked  = !!data.explored;
+  document.getElementById('cell-loop').value        = data.loop || '';
 
   // Hide status row for event rows
   document.getElementById('cell-status-row').style.display = isEvent ? 'none' : '';
@@ -2586,11 +2681,13 @@ function saveCell() {
     info:       document.getElementById('cell-info').value.trim(),
     notes:      document.getElementById('cell-notes').value.trim(),
     status:     editingCell.isEvent ? '' : document.getElementById('cell-status').value,
+    explored:   document.getElementById('cell-explored').checked,
+    loop:       document.getElementById('cell-loop').value || '',
     tags:       [...activeTags],
     updatedAt:  Date.now(),
   };
 
-  if (!data.location && !data.timeDetail && !data.action && !data.info && !data.notes && !data.status) {
+  if (!data.location && !data.timeDetail && !data.action && !data.info && !data.notes && !data.status && !data.explored && !data.loop) {
     clearCellData(charId, slotKey);
     closeModal('cell-modal');
     return;
@@ -3279,26 +3376,7 @@ function renderLocTimeline() {
     nameText.textContent = locName;
     nameTop.appendChild(nameText);
 
-    if (!isUnassigned) {
-      const memoBtn = document.createElement('button');
-      memoBtn.className = 'loc-memo-btn';
-      memoBtn.title = '場所メモを編集';
-      memoBtn.textContent = '📝';
-      memoBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        openLocNoteModal(locName);
-      });
-      nameTop.appendChild(memoBtn);
-    }
     nameInner.appendChild(nameTop);
-
-    const locNote = locationNotes[locName];
-    if (locNote && locNote.memo) {
-      const preview = document.createElement('div');
-      preview.className = 'loc-name-preview';
-      preview.textContent = locNote.memo.split('\n')[0];
-      nameInner.appendChild(preview);
-    }
     nameTd.appendChild(nameInner);
     tr.appendChild(nameTd);
 
@@ -3312,12 +3390,28 @@ function renderLocTimeline() {
         chip.title = ch.name;
         const shortName = ch.name.length > 9 ? ch.name.slice(0, 8) + '…' : ch.name;
         chip.innerHTML = `<span class="loc-char-dot" style="background:${escHtml(ch.color)}"></span>${escHtml(shortName)}`;
-        // クリックでカード詳細モーダルを表示
-        chip.addEventListener('click', () => {
+        chip.addEventListener('click', (e) => {
+          e.stopPropagation();
           openLocChipModal(ch.charId, ch.name, ch.color, slot.key, slot.label, slot.day);
         });
         td.appendChild(chip);
       });
+      // セルのノート表示
+      if (!isUnassigned) {
+        const locSlotNote = (locationNotes[locName] || {})[slot.key];
+        if (locSlotNote && locSlotNote.memo) {
+          td.classList.add('has-note');
+          const noteDiv = document.createElement('div');
+          noteDiv.className = 'loc-cell-note';
+          noteDiv.textContent = locSlotNote.memo;
+          td.appendChild(noteDiv);
+        }
+        // クリックでノートを編集
+        const dayLabel = slot.day === 0 ? '出発日 ' + slot.label : 'D' + slot.day + ' ' + slot.label;
+        td.addEventListener('click', function() {
+          openLocNoteModal(locName, slot.key, dayLabel);
+        });
+      }
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
@@ -3332,28 +3426,36 @@ function renderLocTimeline() {
 // LOCATION NOTE MODAL
 // ═══════════════════════════════════════════════════
 
-function openLocNoteModal(locName) {
+function openLocNoteModal(locName, slotKey, slotLabel) {
   editingLocName = locName;
-  document.getElementById('locnote-modal-title').textContent = '📍 ' + locName;
-  const note = locationNotes[locName] || {};
+  editingLocSlot = slotKey;
+  const title = slotLabel ? '📍 ' + locName + '　' + slotLabel : '📍 ' + locName;
+  document.getElementById('locnote-modal-title').textContent = title;
+  const locData = locationNotes[locName] || {};
+  const note = slotKey ? (locData[slotKey] || {}) : {};
   document.getElementById('locnote-memo').value = note.memo || '';
   document.getElementById('locnote-modal').classList.add('open');
   setTimeout(() => document.getElementById('locnote-memo').focus(), 50);
 }
 
 function saveLocNote() {
-  if (!editingLocName) return;
+  if (!editingLocName || !editingLocSlot) return;
   const memo = document.getElementById('locnote-memo').value.trim();
+  const key = encodeURIComponent(editingLocName);
+  if (!locationNotes[editingLocName]) locationNotes[editingLocName] = {};
   if (memo) {
-    locationNotes[editingLocName] = { memo, updatedAt: Date.now() };
+    locationNotes[editingLocName][editingLocSlot] = { memo, updatedAt: Date.now() };
   } else {
-    delete locationNotes[editingLocName];
+    delete locationNotes[editingLocName][editingLocSlot];
+    if (Object.keys(locationNotes[editingLocName]).length === 0)
+      delete locationNotes[editingLocName];
   }
   if (!isOffline && db) {
+    const path = 'locationNotes/' + key + '/' + editingLocSlot;
     if (memo) {
-      db.ref('locationNotes/' + encodeURIComponent(editingLocName)).set(locationNotes[editingLocName]);
+      db.ref(path).set({ memo, updatedAt: Date.now() });
     } else {
-      db.ref('locationNotes/' + encodeURIComponent(editingLocName)).remove();
+      db.ref(path).remove();
     }
   } else {
     const saved = sessionStorage.getItem('wex_timeline');
