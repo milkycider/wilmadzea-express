@@ -386,6 +386,12 @@
     .timeline-cell.day-change { border-left: 2px solid var(--accent2); }
     .timeline-cell.has-data { background: var(--bg3); }
     .timeline-cell.has-data:hover { background: var(--bg4); }
+    /* セル内状態ライン */
+    .timeline-cell.cell-st-alive    { border-top: 3px solid var(--green);  }
+    .timeline-cell.cell-st-dead     { border-top: 3px solid var(--red);    background: rgba(180,83,75,0.10) !important; }
+    .timeline-cell.cell-st-missing  { border-top: 3px solid var(--orange); background: rgba(230,126,34,0.08) !important; }
+    .timeline-cell.cell-st-unconscious { border-top: 3px solid var(--purple); background: rgba(155,89,182,0.08) !important; }
+    .timeline-cell.cell-st-suspicious  { border-top: 3px solid var(--gold);   background: rgba(255,176,9,0.07) !important; }
     .cell-content {
       font-size: 10px;
       line-height: 1.4;
@@ -2036,7 +2042,10 @@ function renderCells() {
   // Clear all cells first
   document.querySelectorAll('.timeline-cell').forEach(td => {
     const el = document.getElementById(`cell-${td.dataset.charId}-${td.dataset.slotKey}`);
-    if (el) { el.innerHTML = ''; td.classList.remove('has-data'); }
+    if (el) {
+      el.innerHTML = '';
+      td.classList.remove('has-data', 'cell-st-alive', 'cell-st-dead', 'cell-st-missing', 'cell-st-unconscious', 'cell-st-suspicious');
+    }
   });
 
   // Populate cells from timelineData[charId][slotKey]
@@ -2053,14 +2062,19 @@ function renderCells() {
 }
 
 function updateCellDisplay(el, data) {
-  if (!data || (!data.location && !data.action && !data.info && !data.notes && !data.timeDetail)) {
+  const td = el.closest('.timeline-cell');
+  const ST_CLASSES = ['cell-st-alive','cell-st-dead','cell-st-missing','cell-st-unconscious','cell-st-suspicious'];
+  if (!data || (!data.location && !data.action && !data.info && !data.notes && !data.timeDetail && !data.status)) {
     el.innerHTML = '';
-    const td = el.closest('.timeline-cell');
-    if (td) td.classList.remove('has-data');
+    if (td) { td.classList.remove('has-data'); td.classList.remove(...ST_CLASSES); }
     return;
   }
 
-  el.closest('.timeline-cell').classList.add('has-data');
+  if (td) {
+    td.classList.add('has-data');
+    td.classList.remove(...ST_CLASSES);
+    if (data.status) td.classList.add('cell-st-' + data.status);
+  }
   let html = '';
   if (data.timeDetail) html += `<span class="cell-time-detail">${escHtml(data.timeDetail)}</span>`;
   if (data.location)   html += `<div class="cell-location">📍 ${escHtml(data.location)}</div>`;
